@@ -13,6 +13,7 @@
 		514201522437B4B40078DB4F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 514201512437B4B40078DB4F /* Assets.xcassets */; };
 		514201552437B4B40078DB4F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 514201532437B4B40078DB4F /* Main.storyboard */; };
 		514201582437B4B40078DB4F /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 514201572437B4B40078DB4F /* main.m */; };
+		6F1A8E8A0CBF47D9B2765301 /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = 6F1A8E890CBF47D9B2765301 /* Fonts */; };
 		70F584B7D87DC6266FD76EAE /* libPods-com.jingjing2222.macdisplaybar-macOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B04C3734B71B46990060803 /* libPods-com.jingjing2222.macdisplaybar-macOS.a */; };
 		7A1D5C0A2E9B4D0E9A5A1003 /* RCTNativeFoo.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D5C092E9B4D0E9A5A1003 /* RCTNativeFoo.mm */; };
 /* End PBXBuildFile section */
@@ -29,6 +30,7 @@
 		514201562437B4B40078DB4F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		514201572437B4B40078DB4F /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		514201592437B4B40078DB4F /* com.jingjing2222.macdisplaybar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = com.jingjing2222.macdisplaybar.entitlements; sourceTree = "<group>"; };
+		6F1A8E890CBF47D9B2765301 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
 		7A1D5C082E9B4D0E9A5A1003 /* RCTNativeFoo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RCTNativeFoo.h; sourceTree = "<group>"; };
 		7A1D5C092E9B4D0E9A5A1003 /* RCTNativeFoo.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = RCTNativeFoo.mm; sourceTree = "<group>"; };
 		7B04C3734B71B46990060803 /* libPods-com.jingjing2222.macdisplaybar-macOS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-com.jingjing2222.macdisplaybar-macOS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -71,6 +73,7 @@
 				5142014C2437B4B30078DB4F /* AppDelegate.mm */,
 				7A1D5C072E9B4D0E9A5A1003 /* NativeFoo */,
 				514201512437B4B40078DB4F /* Assets.xcassets */,
+				6F1A8E890CBF47D9B2765301 /* Fonts */,
 				514201532437B4B40078DB4F /* Main.storyboard */,
 				514201562437B4B40078DB4F /* Info.plist */,
 				514201572437B4B40078DB4F /* main.m */,
@@ -222,6 +225,7 @@
 			files = (
 				514201522437B4B40078DB4F /* Assets.xcassets in Resources */,
 				514201552437B4B40078DB4F /* Main.storyboard in Resources */,
+				6F1A8E8A0CBF47D9B2765301 /* Fonts in Resources */,
 				17F39AE699EA5B1B65BE6423 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
