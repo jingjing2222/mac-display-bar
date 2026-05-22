@@ -75,12 +75,17 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: node scripts/ci/assert-release-version.mjs
 
-      - name: Ensure fingerprint is fresh
+      - name: Ensure fingerprint changed
         if: steps.version.outputs.version_changed == 'true'
+        env:
+          BASE_SHA: ${{ github.event.before }}
         run: |
-          yarn fingerprint:create
-          if ! git diff --exit-code -- fingerprint.json; then
-            echo "::error::fingerprint.json is stale. Run yarn fingerprint:create and commit the result."
+          if [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "::error::BASE_SHA is required to verify fingerprint.json changed with the release version."
+            exit 1
+          fi
+          if git diff --quiet "$BASE_SHA" HEAD -- fingerprint.json; then
+            echo "::error::fingerprint.json must change when Info.plist CFBundleShortVersionString changes."
             exit 1
           fi
 

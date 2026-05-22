@@ -97,6 +97,15 @@
       },
       {
         "type": "contents",
+        "id": "macos/fingerprint-version.txt",
+        "contents": "CFBundleShortVersionString=0.0.1-alpha.1\n",
+        "reasons": [
+          "custom-user-config"
+        ],
+        "hash": "ed8b3ea44be8e5b097a37488b549b4863fedd180"
+      },
+      {
+        "type": "contents",
         "id": "macos/Podfile",
         "contents": "require 'pathname'\n\nws_dir = Pathname.new(__dir__)\nws_dir = ws_dir.parent until\n  File.exist?(\"#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb\") ||\n  ws_dir.expand_path.to_s == '/'\nrequire \"#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb\"\n\nENV['RCT_NEW_ARCH_ENABLED'] = '1'\n\nprepare_react_native_project!\n\ntarget 'com.jingjing2222.macdisplaybar-macOS' do\n  platform :macos, '14.0'\n  use_native_modules!\n\n  # Flags change depending on the env values.\n  flags = get_default_flags()\n\n  use_react_native!(\n    :path => '../node_modules/react-native-macos',\n    :fabric_enabled => true,\n    # An absolute path to your application root.\n    :app_path => \"#{Pod::Config.instance.installation_root}/..\"\n  )\n\n  post_install do |installer|\n    react_native_post_install(installer)\n\n    # Xcode 26.x rejects fmt 11 compile-time format checks under C++20.\n    # Keep the workaround scoped to fmt; other React Native pods still use C++20.\n    installer.pods_project.targets.each do |target|\n      next unless target.name == 'fmt'\n\n      target.build_configurations.each do |config|\n        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'\n      end\n    end\n  end\nend\n",
         "reasons": [
@@ -141,7 +150,7 @@
         "hash": "46804e277638c5a94bcee96cb7c350f16b17e257"
       }
     ],
-    "hash": "7465e9bbe31115eaf36178966a0ad3023d4fb7a0"
+    "hash": "eb9460eae10f7b5c983971efe59537f205df3d0a"
   },
   "android": {
     "sources": [
@@ -241,6 +250,15 @@
       },
       {
         "type": "contents",
+        "id": "macos/fingerprint-version.txt",
+        "contents": "CFBundleShortVersionString=0.0.1-alpha.1\n",
+        "reasons": [
+          "custom-user-config"
+        ],
+        "hash": "ed8b3ea44be8e5b097a37488b549b4863fedd180"
+      },
+      {
+        "type": "contents",
         "id": "macos/Podfile",
         "contents": "require 'pathname'\n\nws_dir = Pathname.new(__dir__)\nws_dir = ws_dir.parent until\n  File.exist?(\"#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb\") ||\n  ws_dir.expand_path.to_s == '/'\nrequire \"#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb\"\n\nENV['RCT_NEW_ARCH_ENABLED'] = '1'\n\nprepare_react_native_project!\n\ntarget 'com.jingjing2222.macdisplaybar-macOS' do\n  platform :macos, '14.0'\n  use_native_modules!\n\n  # Flags change depending on the env values.\n  flags = get_default_flags()\n\n  use_react_native!(\n    :path => '../node_modules/react-native-macos',\n    :fabric_enabled => true,\n    # An absolute path to your application root.\n    :app_path => \"#{Pod::Config.instance.installation_root}/..\"\n  )\n\n  post_install do |installer|\n    react_native_post_install(installer)\n\n    # Xcode 26.x rejects fmt 11 compile-time format checks under C++20.\n    # Keep the workaround scoped to fmt; other React Native pods still use C++20.\n    installer.pods_project.targets.each do |target|\n      next unless target.name == 'fmt'\n\n      target.build_configurations.each do |config|\n        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'\n      end\n    end\n  end\nend\n",
         "reasons": [
@@ -285,7 +303,7 @@
         "hash": "46804e277638c5a94bcee96cb7c350f16b17e257"
       }
     ],
-    "hash": "7465e9bbe31115eaf36178966a0ad3023d4fb7a0"
+    "hash": "eb9460eae10f7b5c983971efe59537f205df3d0a"
   },
   "macos": {
     "sources": [
@@ -385,6 +403,15 @@
       },
       {
         "type": "contents",
+        "id": "macos/fingerprint-version.txt",
+        "contents": "CFBundleShortVersionString=0.0.1-alpha.1\n",
+        "reasons": [
+          "custom-user-config"
+        ],
+        "hash": "ed8b3ea44be8e5b097a37488b549b4863fedd180"
+      },
+      {
+        "type": "contents",
         "id": "macos/Podfile",
         "contents": "require 'pathname'\n\nws_dir = Pathname.new(__dir__)\nws_dir = ws_dir.parent until\n  File.exist?(\"#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb\") ||\n  ws_dir.expand_path.to_s == '/'\nrequire \"#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb\"\n\nENV['RCT_NEW_ARCH_ENABLED'] = '1'\n\nprepare_react_native_project!\n\ntarget 'com.jingjing2222.macdisplaybar-macOS' do\n  platform :macos, '14.0'\n  use_native_modules!\n\n  # Flags change depending on the env values.\n  flags = get_default_flags()\n\n  use_react_native!(\n    :path => '../node_modules/react-native-macos',\n    :fabric_enabled => true,\n    # An absolute path to your application root.\n    :app_path => \"#{Pod::Config.instance.installation_root}/..\"\n  )\n\n  post_install do |installer|\n    react_native_post_install(installer)\n\n    # Xcode 26.x rejects fmt 11 compile-time format checks under C++20.\n    # Keep the workaround scoped to fmt; other React Native pods still use C++20.\n    installer.pods_project.targets.each do |target|\n      next unless target.name == 'fmt'\n\n      target.build_configurations.each do |config|\n        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'\n      end\n    end\n  end\nend\n",
         "reasons": [
@@ -429,6 +456,6 @@
         "hash": "46804e277638c5a94bcee96cb7c350f16b17e257"
       }
     ],
-    "hash": "7465e9bbe31115eaf36178966a0ad3023d4fb7a0"
+    "hash": "eb9460eae10f7b5c983971efe59537f205df3d0a"
   }
 }
