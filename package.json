@@ -15,6 +15,9 @@
   },
   "dependencies": {
     "@hot-updater/react-native": "patch:@hot-updater/react-native@npm%3A0.32.0#~/.yarn/patches/@hot-updater-react-native-npm-0.32.0-8cbcc9f116.patch",
+    "@legendapp/list": "^2.0.19",
+    "@shopify/flash-list": "^2.3.1",
+    "overlay-kit": "^1.9.0",
     "react": "19.1.4",
     "react-native": "0.81.6",
     "react-native-macos": "^0.81.0-0",
@@ -24,6 +27,7 @@
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
+    "@expo/fingerprint": "^0.15.4",
     "@granite-js/vitest": "^1.0.28",
     "@hot-updater/bare": "0.32.0",
     "@hot-updater/cloudflare": "patch:@hot-updater/cloudflare@npm%3A0.32.0#~/.yarn/patches/@hot-updater-cloudflare-npm-0.32.0-556ee3faef.patch",

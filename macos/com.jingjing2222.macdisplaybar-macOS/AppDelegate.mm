@@ -9,6 +9,7 @@
 @property (nonatomic, strong) NSStatusItem *statusItem;
 @property (nonatomic, strong) NSPopover *statusPopover;
 @property (nonatomic, strong) NSWindow *reactHostWindow;
+@property (nonatomic, strong) id outsideClickMonitor;
 
 @end
 
@@ -38,8 +39,12 @@
   self.statusPopover.animates = YES;
   self.statusPopover.contentSize = NSMakeSize(520, 720);
   self.statusPopover.contentViewController = rootViewController;
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(closeStatusPopover:)
+                                               name:NSApplicationDidResignActiveNotification
+                                             object:NSApp];
 
-  self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+  self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:28.0];
   NSStatusBarButton *button = self.statusItem.button;
   button.toolTip = @"macDisplayBar";
   button.target = self;
@@ -47,6 +52,7 @@
   [button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
 
   NSImage *statusImage = [NSImage imageNamed:@"StatusBarIcon"];
+  statusImage.size = NSMakeSize(22.0, 22.0);
   [statusImage setTemplate:YES];
   button.image = statusImage;
   button.imagePosition = NSImageOnly;
@@ -63,19 +69,60 @@
   NSEvent *event = NSApp.currentEvent;
 
   if (event.type == NSEventTypeRightMouseUp) {
-    [self.statusPopover performClose:sender];
+    [self closeStatusPopover:sender];
     [NSMenu popUpContextMenu:[self statusContextMenu] withEvent:event forView:button];
     return;
   }
 
   if (self.statusPopover.shown) {
-    [self.statusPopover performClose:sender];
+    [self closeStatusPopover:sender];
     return;
   }
 
   [self.statusPopover showRelativeToRect:button.bounds
                                   ofView:button
                            preferredEdge:NSRectEdgeMinY];
+  [self installOutsideClickMonitor];
+}
+
+- (void)closeStatusPopover:(id)sender
+{
+  if (self.statusPopover.shown) {
+    [self.statusPopover performClose:sender];
+  }
+
+  [self uninstallOutsideClickMonitor];
+}
+
+- (void)installOutsideClickMonitor
+{
+  if (self.outsideClickMonitor != nil) {
+    return;
+  }
+
+  __weak AppDelegate *weakSelf = self;
+  self.outsideClickMonitor =
+      [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown
+                                             handler:^(NSEvent *event) {
+                                               dispatch_async(dispatch_get_main_queue(), ^{
+                                                 [weakSelf closeStatusPopover:event];
+                                               });
+                                             }];
+}
+
+- (void)uninstallOutsideClickMonitor
+{
+  if (self.outsideClickMonitor == nil) {
+    return;
+  }
+
+  [NSEvent removeMonitor:self.outsideClickMonitor];
+  self.outsideClickMonitor = nil;
+}
+
+- (void)popoverDidClose:(NSNotification *)notification
+{
+  [self uninstallOutsideClickMonitor];
 }
 
 - (NSMenu *)statusContextMenu
@@ -97,6 +144,9 @@
 
 - (void)applicationWillTerminate:(NSNotification *)notification
 {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  [self uninstallOutsideClickMonitor];
+
   if (self.statusItem != nil) {
     [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
   }

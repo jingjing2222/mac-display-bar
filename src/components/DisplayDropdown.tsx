@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { DisplayControlDisplay } from '../../specs/NativeDisplayControl';
 import type { TranslationKey } from '../i18n/strings';
 import { Icon } from './Icon';
+import { StableLegendList } from './StableLegendList';
 
 const font = {
   family: 'Inter',
@@ -60,45 +61,54 @@ export function DisplayDropdown({
       </Pressable>
 
       {open ? (
-        <View style={styles.menu}>
-          {displays.map((display) => {
-            const selected = display.id === selectedDisplay.id;
+        <View
+          style={[
+            styles.menu,
+            { height: Math.min(Math.max(displays.length, 1), 3) * 70 + 12 },
+          ]}
+        >
+          <StableLegendList
+            data={displays}
+            estimatedItemSize={70}
+            keyExtractor={(display) => display.id}
+            renderItem={({ item: display }) => {
+              const selected = display.id === selectedDisplay.id;
 
-            return (
-              <Pressable
-                accessibilityRole="button"
-                key={display.id}
-                onPress={() => {
-                  onSelect(display.id);
-                  setOpen(false);
-                }}
-                style={({ pressed }) => [
-                  styles.option,
-                  selected && styles.optionSelected,
-                  pressed && styles.optionPressed,
-                ]}
-              >
-                <View style={styles.check}>
-                  {selected ? (
-                    <Icon color="#2b89ff" name="check" size={15} />
-                  ) : null}
-                </View>
-                <View style={styles.optionTextBlock}>
-                  <Text style={styles.optionName}>{display.name}</Text>
-                  <Text style={styles.optionMeta}>
-                    {displaySubtitle(display, t)}
-                  </Text>
-                </View>
-                <View style={styles.pills}>
-                  <Pill
-                    label={display.isBuiltin ? t('builtIn') : t('external')}
-                  />
-                  {display.isPrimary ? <Pill label={t('primary')} /> : null}
-                  {display.isMirrored ? <Pill label={t('mirrored')} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    onSelect(display.id);
+                    setOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.option,
+                    selected && styles.optionSelected,
+                    pressed && styles.optionPressed,
+                  ]}
+                >
+                  <View style={styles.check}>
+                    {selected ? (
+                      <Icon color="#2b89ff" name="check" size={15} />
+                    ) : null}
+                  </View>
+                  <View style={styles.optionTextBlock}>
+                    <Text style={styles.optionName}>{display.name}</Text>
+                    <Text style={styles.optionMeta}>
+                      {displaySubtitle(display, t)}
+                    </Text>
+                  </View>
+                  <View style={styles.pills}>
+                    <Pill
+                      label={display.isBuiltin ? t('builtIn') : t('external')}
+                    />
+                    {display.isPrimary ? <Pill label={t('primary')} /> : null}
+                    {display.isMirrored ? <Pill label={t('mirrored')} /> : null}
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
         </View>
       ) : null}
     </View>

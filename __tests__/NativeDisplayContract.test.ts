@@ -33,6 +33,18 @@ const displayControlPanel = readFileSync(
   join(repoRoot, 'src/components/DisplayControlPanel.tsx'),
   'utf8',
 );
+const resolutionPicker = readFileSync(
+  join(repoRoot, 'src/components/ResolutionPicker.tsx'),
+  'utf8',
+);
+const resolutionModeOverlay = readFileSync(
+  join(repoRoot, 'src/components/ResolutionModeOverlay.tsx'),
+  'utf8',
+);
+const stableLegendList = readFileSync(
+  join(repoRoot, 'src/components/StableLegendList.tsx'),
+  'utf8',
+);
 const topLevelDisplayHookPath = join(
   repoRoot,
   'src/hooks/useDisplayControl.ts',
@@ -295,6 +307,21 @@ test('menu UI uses react-native-svg backed public icon paths', () => {
   expect(iconSource).toContain('name: IconName');
   expect(iconSource).toContain("case 'display'");
   expect(iconSource).toContain("case 'sliders'");
+});
+
+test('menu lists use JS-only overlay and FlashList-backed list', () => {
+  expect(packageJson).toContain('"overlay-kit"');
+  expect(packageJson).toContain('"@legendapp/list"');
+  expect(packageJson).toContain('"@shopify/flash-list"');
+  expect(app).toContain('OverlayProvider');
+  expect(resolutionPicker).toContain("from 'overlay-kit'");
+  expect(resolutionPicker).toContain('ResolutionModeOverlay');
+  expect(resolutionModeOverlay).toContain('TextInput');
+  expect(resolutionModeOverlay).toContain('StableLegendList');
+  expect(displayControlPanel).toContain('StableLegendList');
+  expect(stableLegendList).toContain("from '@shopify/flash-list'");
+  expect(stableLegendList).toContain('FlashList');
+  expect(stableLegendList).toContain('removeClippedSubviews={false}');
 });
 
 test('custom resolution drafts follow current mode snapshot changes', () => {

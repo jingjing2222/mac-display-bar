@@ -189,3 +189,99 @@ index 7eca8631bbec800f5b384a3669873e4bbd65e44e..6a1f43f6ae10fc9d52b7eb559b416b08
  			`Base bundle: ${options.baseBundleId}`,
  			`Target bundle: ${options.bundleId}`
  		].join("\n"), "Patch");
+diff --git a/dist/keyGeneration-V0wSl0zg.mjs b/dist/keyGeneration-V0wSl0zg.mjs
+index 2e0bb123968945d4004931e26699edb6be434f13..ba17e969c279a2d9fb49fd6e2a9e94b0a47dc748 100644
+--- a/dist/keyGeneration-V0wSl0zg.mjs
++++ b/dist/keyGeneration-V0wSl0zg.mjs
+@@ -12293,10 +12293,15 @@ const setIosFingerprintHash = async (hash) => {
+ 	const customPaths = (await loadConfig(null)).platform.ios.infoPlistPaths;
+ 	return await new IosConfigParser(customPaths).set("HOT_UPDATER_FINGERPRINT_HASH", hash);
+ };
++const setMacOSFingerprintHash = async (hash) => {
++	const customPaths = (await loadConfig(null)).platform.macos.infoPlistPaths;
++	return await new IosConfigParser(customPaths).set("HOT_UPDATER_FINGERPRINT_HASH", hash);
++};
+ const setFingerprintHash = async (platform, hash) => {
+ 	switch (platform) {
+ 		case "android": return await setAndroidFingerprintHash(hash);
+ 		case "ios": return await setIosFingerprintHash(hash);
++		case "macos": return await setMacOSFingerprintHash(hash);
+ 	}
+ };
+ //#endregion
+@@ -18013,11 +18018,11 @@ async function getOtaFingerprintOptions(platform, path, options) {
+ }
+ function isFingerprintEquals(lhs, rhs) {
+ 	if (!lhs || !rhs) return false;
+-	if (isFingerprintResultsObject(lhs) && isFingerprintResultsObject(rhs)) return lhs.android.hash === rhs.android.hash && lhs.ios.hash === rhs.ios.hash;
++	if (isFingerprintResultsObject(lhs) && isFingerprintResultsObject(rhs)) return lhs.android.hash === rhs.android.hash && lhs.ios.hash === rhs.ios.hash && lhs.macos.hash === rhs.macos.hash;
+ 	if (!isFingerprintResultsObject(lhs) && !isFingerprintResultsObject(rhs)) return lhs["hash"] === rhs["hash"];
+ 	return false;
+ 	function isFingerprintResultsObject(result) {
+-		return typeof result["android"] === "object" && typeof result["ios"] === "object" && !!result["android"]?.hash && !!result["ios"]?.hash;
++		return typeof result["android"] === "object" && typeof result["ios"] === "object" && typeof result["macos"] === "object" && !!result["android"]?.hash && !!result["ios"]?.hash && !!result["macos"]?.hash;
+ 	}
+ }
+ //#endregion
+@@ -18055,16 +18060,20 @@ async function nativeFingerprint(path, options) {
+ const generateFingerprints = async () => {
+ 	const fingerprintConfig = await ensureFingerprintConfig();
+ 	const projectPath = getCwd();
+-	const [ios, android] = await Promise.all([nativeFingerprint(projectPath, {
++	const [ios, android, macos] = await Promise.all([nativeFingerprint(projectPath, {
+ 		platform: "ios",
+ 		...fingerprintConfig
+ 	}), nativeFingerprint(projectPath, {
+ 		platform: "android",
+ 		...fingerprintConfig
++	}), nativeFingerprint(projectPath, {
++		platform: "macos",
++		...fingerprintConfig
+ 	})]);
+ 	return {
+ 		ios,
+-		android
++		android,
++		macos
+ 	};
+ };
+ const generateFingerprint = async (platform) => {
+@@ -18079,16 +18088,20 @@ const createAndInjectFingerprintFiles = async ({ platform } = {}) => {
+ 	const newFingerprint = await generateFingerprints();
+ 	const androidPaths = [];
+ 	const iosPaths = [];
++	const macosPaths = [];
+ 	if (!localFingerprint || !platform) {
+ 		await createFingerprintJSON(newFingerprint);
+ 		const { paths: _androidPaths } = await setFingerprintHash("android", newFingerprint.android.hash);
+ 		androidPaths.push(..._androidPaths);
+ 		const { paths: _iosPaths } = await setFingerprintHash("ios", newFingerprint.ios.hash);
+ 		iosPaths.push(..._iosPaths);
++		const { paths: _macosPaths } = await setFingerprintHash("macos", newFingerprint.macos.hash);
++		macosPaths.push(..._macosPaths);
+ 	} else {
+ 		await createFingerprintJSON({
+ 			android: localFingerprint.android || newFingerprint.android,
+ 			ios: localFingerprint.ios || newFingerprint.ios,
++			macos: localFingerprint.macos || newFingerprint.macos,
+ 			[platform]: newFingerprint[platform]
+ 		});
+ 		const { paths: _platformPaths } = await setFingerprintHash(platform, newFingerprint[platform].hash);
+@@ -18099,12 +18112,16 @@ const createAndInjectFingerprintFiles = async ({ platform } = {}) => {
+ 			case "ios":
+ 				iosPaths.push(..._platformPaths);
+ 				break;
++			case "macos":
++				macosPaths.push(..._platformPaths);
++				break;
+ 		}
+ 	}
+ 	return {
+ 		fingerprint: newFingerprint,
+ 		androidPaths,
+-		iosPaths
++		iosPaths,
++		macosPaths
+ 	};
+ };
+ const createFingerprintJSON = async (fingerprint) => {

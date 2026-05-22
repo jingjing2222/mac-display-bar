@@ -41,7 +41,7 @@ test('macOS bundle is configured as a menu bar only app', () => {
 
 test('React Native host view is moved into an NSPopover backed by NSStatusItem', () => {
   expect(appDelegate).toContain(
-    '[[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength]',
+    '[[NSStatusBar systemStatusBar] statusItemWithLength:28.0]',
   );
   expect(appDelegate).toContain('self.statusPopover = [NSPopover new]');
   expect(appDelegate).toContain(
@@ -54,6 +54,8 @@ test('React Native host view is moved into an NSPopover backed by NSStatusItem',
 
 test('menu bar shell uses the bundled template status bar icon', () => {
   expect(appDelegate).toContain('[NSImage imageNamed:@"StatusBarIcon"]');
+  expect(appDelegate).toContain('statusItemWithLength:28.0');
+  expect(appDelegate).toContain('statusImage.size = NSMakeSize(22.0, 22.0)');
   expect(appDelegate).toContain('[statusImage setTemplate:YES]');
   expect(appDelegate).toContain('button.toolTip = @"macDisplayBar"');
   expect(appDelegate).not.toContain('imageWithSystemSymbolName:@"display"');
@@ -67,6 +69,17 @@ test('status item right click exposes a quit menu', () => {
   expect(appDelegate).toContain('popUpContextMenu');
   expect(appDelegate).toContain('initWithTitle:@"Quit macDisplayBar"');
   expect(appDelegate).toContain('[NSApp terminate:sender]');
+});
+
+test('menu bar popover closes when focus moves outside the app', () => {
+  expect(appDelegate).toContain('NSApplicationDidResignActiveNotification');
+  expect(appDelegate).toContain('closeStatusPopover:');
+  expect(appDelegate).toContain(
+    'NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown',
+  );
+  expect(appDelegate).toContain('addGlobalMonitorForEventsMatchingMask');
+  expect(appDelegate).toContain('removeMonitor:self.outsideClickMonitor');
+  expect(appDelegate).toContain('popoverDidClose:');
 });
 
 test('startup window is hidden from normal window and app switcher flows', () => {

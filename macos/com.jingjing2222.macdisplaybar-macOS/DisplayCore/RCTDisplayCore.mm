@@ -107,6 +107,7 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *dimmingLevels;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSWindow *> *dimmingWindows;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSWindow *> *xdrUpscaleWindows;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *ddcValues;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *ddcErrors;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *ddcReadStatus;
@@ -180,6 +181,7 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     NSDictionary *storedSettings = [[NSUserDefaults standardUserDefaults] dictionaryForKey:RCTDisplaySettingsDefaultsKey];
     self.dimmingLevels = storedLevels != nil ? [storedLevels mutableCopy] : [NSMutableDictionary new];
     self.dimmingWindows = [NSMutableDictionary new];
+    self.xdrUpscaleWindows = [NSMutableDictionary new];
     self.ddcValues = storedDdcValues != nil ? [storedDdcValues mutableCopy] : [NSMutableDictionary new];
     self.ddcErrors = [NSMutableDictionary new];
     self.ddcReadStatus = [NSMutableDictionary new];
@@ -633,10 +635,20 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
 - (NSDictionary *)enableXdrUpscale:(NSString *)displayID
 {
-  BOOL supportsHdr = [self displaySupportsHdrForDisplayID:(CGDirectDisplayID)displayID.integerValue];
-  self.xdrUpscaleStates[displayID] = supportsHdr ? @"entrypoint-enabled" : @"unsupported";
-  [self recordAdvancedOperation:(supportsHdr ? @"XDR upscale entrypoint enabled" : @"XDR upscale unsupported")
-                       displayID:displayID];
+  CGDirectDisplayID directDisplayID = (CGDirectDisplayID)displayID.integerValue;
+  BOOL supportsHdr = [self displaySupportsHdrForDisplayID:directDisplayID];
+
+  if (supportsHdr) {
+    [self setNativeBrightnessForDisplayID:directDisplayID level:1 errorMessage:nil];
+    [self syncXdrUpscaleWindowForDisplayID:directDisplayID enabled:YES];
+    self.xdrUpscaleStates[displayID] = @"enabled";
+    [self recordAdvancedOperation:@"Extra brightness enabled" displayID:displayID];
+  } else {
+    [self syncXdrUpscaleWindowForDisplayID:directDisplayID enabled:NO];
+    self.xdrUpscaleStates[displayID] = @"unsupported";
+    [self recordAdvancedOperation:@"Extra brightness unsupported" displayID:displayID];
+  }
+
   [[NSUserDefaults standardUserDefaults] setObject:self.xdrUpscaleStates forKey:RCTDisplayXdrUpscaleDefaultsKey];
 
   return [self stubbedSnapshot];
@@ -644,8 +656,9 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
 - (NSDictionary *)disableXdrUpscale:(NSString *)displayID
 {
+  [self syncXdrUpscaleWindowForDisplayID:(CGDirectDisplayID)displayID.integerValue enabled:NO];
   self.xdrUpscaleStates[displayID] = @"disabled";
-  [self recordAdvancedOperation:@"XDR upscale entrypoint disabled" displayID:displayID];
+  [self recordAdvancedOperation:@"Extra brightness disabled" displayID:displayID];
   [[NSUserDefaults standardUserDefaults] setObject:self.xdrUpscaleStates forKey:RCTDisplayXdrUpscaleDefaultsKey];
 
   return [self stubbedSnapshot];
@@ -2651,6 +2664,65 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   return CGDisplayIOServicePort(displayID);
 #pragma clang diagnostic pop
+}
+
+- (void)syncXdrUpscaleWindowForDisplayID:(CGDirectDisplayID)displayID enabled:(BOOL)enabled
+{
+  if (![NSThread isMainThread]) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [self syncXdrUpscaleWindowForDisplayID:displayID enabled:enabled];
+    });
+    return;
+  }
+
+  NSString *displayIDString = [NSString stringWithFormat:@"%u", displayID];
+  NSWindow *window = self.xdrUpscaleWindows[displayIDString];
+
+  if (!enabled) {
+    [window orderOut:nil];
+    [self.xdrUpscaleWindows removeObjectForKey:displayIDString];
+    return;
+  }
+
+  NSScreen *screen = [self screenForDisplayID:displayID];
+
+  if (screen == nil) {
+    [window orderOut:nil];
+    [self.xdrUpscaleWindows removeObjectForKey:displayIDString];
+    return;
+  }
+
+  if (window == nil) {
+    window = [[NSWindow alloc] initWithContentRect:screen.frame
+                                        styleMask:NSWindowStyleMaskBorderless
+                                          backing:NSBackingStoreBuffered
+                                            defer:NO
+                                           screen:screen];
+    window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
+        NSWindowCollectionBehaviorFullScreenAuxiliary |
+        NSWindowCollectionBehaviorStationary |
+        NSWindowCollectionBehaviorIgnoresCycle;
+    window.ignoresMouseEvents = YES;
+    window.level = NSFloatingWindowLevel;
+    window.opaque = NO;
+    window.releasedWhenClosed = NO;
+    window.backgroundColor = NSColor.clearColor;
+    window.contentView = [NSView new];
+    self.xdrUpscaleWindows[displayIDString] = window;
+  }
+
+  CGFloat potentialHeadroom = MAX(screen.maximumPotentialExtendedDynamicRangeColorComponentValue, 1);
+  CGFloat boostComponent = MIN(potentialHeadroom, 2);
+  CGFloat components[] = {boostComponent, boostComponent, boostComponent, 0.16};
+  NSColor *boostColor = [NSColor colorWithColorSpace:[NSColorSpace extendedSRGBColorSpace]
+                                         components:components
+                                              count:4];
+
+  [window setFrame:screen.frame display:YES];
+  window.contentView.wantsLayer = YES;
+  window.contentView.layer.backgroundColor =
+      (boostColor ?: [NSColor colorWithCalibratedWhite:1 alpha:0.16]).CGColor;
+  [window orderFrontRegardless];
 }
 
 - (void)syncDimmingWindowForDisplayID:(CGDirectDisplayID)displayID level:(double)level

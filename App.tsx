@@ -1,4 +1,5 @@
 import { HotUpdater } from '@hot-updater/react-native';
+import { OverlayProvider } from 'overlay-kit';
 
 import { MenuShell } from './src/components/MenuShell';
 import { hotUpdaterBaseURL } from './src/config/hotUpdaterConfig';
@@ -7,12 +8,16 @@ import { useDisplayControl } from './src/hooks/display/useDisplayControl';
 function App() {
   const control = useDisplayControl();
 
-  return <MenuShell control={control} />;
+  return (
+    <OverlayProvider>
+      <MenuShell control={control} />
+    </OverlayProvider>
+  );
 }
 
 export default HotUpdater.wrap({
   baseURL: hotUpdaterBaseURL,
-  updateStrategy: 'appVersion',
+  updateStrategy: 'fingerprint',
   onError: (error) => {
     console.warn(error);
   },

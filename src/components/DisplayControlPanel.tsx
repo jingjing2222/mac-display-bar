@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type {
   DisplayControlColorProfile,
@@ -20,6 +13,7 @@ import { ControlSlider } from './ControlSlider';
 import { Icon, type IconName } from './Icon';
 import { modeLabel, ResolutionPicker } from './ResolutionPicker';
 import { SegmentedTabs } from './SegmentedTabs';
+import { StableLegendList } from './StableLegendList';
 
 const font = {
   family: 'Inter',
@@ -63,7 +57,12 @@ export function DisplayControlPanel({
         <ColorPanel actions={control.actions} display={display} t={t} />
       ) : null}
       {activeTab === 'arrange' ? (
-        <ArrangementPanel actions={control.actions} display={display} t={t} />
+        <ArrangementPanel
+          actions={control.actions}
+          display={display}
+          displayCount={control.snapshot.displays.length}
+          t={t}
+        />
       ) : null}
       {activeTab === 'input' ? (
         <InputPanel actions={control.actions} display={display} t={t} />
@@ -199,19 +198,22 @@ function ColorPanel({
         />
       </View>
       {display.colorProfiles.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chipRow}>
-            {display.colorProfiles.map((profile) => (
-              <ProfileChip
-                key={profile.id}
-                onSelect={(profileID) =>
-                  actions.setColorProfile(display.id, profileID)
-                }
-                profile={profile}
-              />
-            ))}
-          </View>
-        </ScrollView>
+        <StableLegendList
+          data={display.colorProfiles}
+          estimatedItemSize={132}
+          horizontal
+          keyExtractor={(profile) => profile.id}
+          renderItem={({ item: profile }) => (
+            <ProfileChip
+              onSelect={(profileID) =>
+                actions.setColorProfile(display.id, profileID)
+              }
+              profile={profile}
+            />
+          )}
+          showsHorizontalScrollIndicator={false}
+          style={styles.horizontalList}
+        />
       ) : (
         <Notice text={t('noColorProfiles')} />
       )}
@@ -225,13 +227,16 @@ function ColorPanel({
 function ArrangementPanel({
   actions,
   display,
+  displayCount,
   t,
 }: {
   actions: DisplayActions;
   display: DisplayControlDisplay;
+  displayCount: number;
   t: (key: TranslationKey) => string;
 }) {
   const step = 100;
+  const canMoveDisplay = displayCount > 1;
   const moves = [
     { label: t('moveUp'), x: display.frame.x, y: display.frame.y - step },
     { label: t('moveLeft'), x: display.frame.x - step, y: display.frame.y },
@@ -245,9 +250,11 @@ function ArrangementPanel({
         label={t('arrangement')}
         value={`${Math.round(display.frame.x)}, ${Math.round(display.frame.y)}`}
       />
+      {!canMoveDisplay ? <Notice text={t('arrangementMultipleOnly')} /> : null}
       <ActionRow>
         {moves.map((move) => (
           <ActionButton
+            disabled={!canMoveDisplay}
             key={move.label}
             icon="layout"
             label={move.label}
@@ -306,22 +313,25 @@ function InputPanel({
         value={display.ddc.volume / 100}
       />
       <Text style={styles.itemTitle}>{t('inputSource')}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.chipRow}>
-          {inputOptions.map((option) => (
-            <ActionButton
-              key={option.value}
-              icon="plug"
-              label={option.label}
-              onPress={() =>
-                actions.setDdcControl(display.id, 0x60, option.value)
-              }
-              selected={Math.round(display.ddc.inputSource) === option.value}
-              small
-            />
-          ))}
-        </View>
-      </ScrollView>
+      <StableLegendList
+        data={inputOptions}
+        estimatedItemSize={82}
+        horizontal
+        keyExtractor={(option) => `${option.value}`}
+        renderItem={({ item: option }) => (
+          <ActionButton
+            icon="plug"
+            label={option.label}
+            onPress={() =>
+              actions.setDdcControl(display.id, 0x60, option.value)
+            }
+            selected={Math.round(display.ddc.inputSource) === option.value}
+            small
+          />
+        )}
+        showsHorizontalScrollIndicator={false}
+        style={styles.horizontalList}
+      />
       {display.ddc.lastError ? <Notice text={display.ddc.lastError} /> : null}
     </View>
   );
@@ -413,16 +423,22 @@ function AdvancedDisplayPanel({
         />
       </ActionRow>
       <Text style={styles.itemTitle}>{t('extraBrightness')}</Text>
+      {!display.supportsHdr ? (
+        <Notice text={t('extraBrightnessUnsupported')} />
+      ) : null}
       <ActionRow>
         <ActionButton
+          disabled={!display.supportsHdr}
           icon="zap"
           label={t('enable')}
           onPress={() => actions.enableXdrUpscale(display.id)}
+          selected={display.advanced.xdrUpscaleState === 'enabled'}
         />
         <ActionButton
           icon="zap"
           label={t('disable')}
           onPress={() => actions.disableXdrUpscale(display.id)}
+          selected={display.advanced.xdrUpscaleState === 'disabled'}
         />
       </ActionRow>
       <ActionRow>
@@ -472,24 +488,41 @@ function AdvancedDisplayPanel({
           }
         />
       </ActionRow>
-      {display.advanced.customResolutions.map((request) => (
-        <View key={request.id} style={styles.itemHeader}>
-          <View style={styles.itemTextBlock}>
-            <Text style={styles.itemTitle}>
-              {request.width} x {request.height}
-            </Text>
-            <Text style={styles.itemMeta}>{request.status}</Text>
-          </View>
-          <ActionButton
-            icon="settings"
-            label={t('remove')}
-            onPress={() =>
-              actions.removeCustomResolution(display.id, request.id)
-            }
-            small
-          />
-        </View>
-      ))}
+      {display.advanced.customResolutions.length > 0 ? (
+        <StableLegendList
+          data={display.advanced.customResolutions}
+          estimatedItemSize={58}
+          keyExtractor={(request) => request.id}
+          renderItem={({ item: request }) => (
+            <View style={styles.itemHeader}>
+              <View style={styles.itemTextBlock}>
+                <Text style={styles.itemTitle}>
+                  {request.width} x {request.height}
+                </Text>
+                <Text style={styles.itemMeta}>{request.status}</Text>
+              </View>
+              <ActionButton
+                icon="settings"
+                label={t('remove')}
+                onPress={() =>
+                  actions.removeCustomResolution(display.id, request.id)
+                }
+                small
+              />
+            </View>
+          )}
+          scrollEnabled={display.advanced.customResolutions.length > 3}
+          style={[
+            styles.inlineList,
+            {
+              height: inlineListHeight(
+                display.advanced.customResolutions.length,
+                58,
+              ),
+            },
+          ]}
+        />
+      ) : null}
       <AutomationPanel control={control} t={t} />
     </View>
   );
@@ -529,26 +562,38 @@ function AutomationPanel({
           small
         />
       </View>
-      {snapshot.presets.map((preset) => (
-        <View key={preset.name} style={styles.itemHeader}>
-          <View style={styles.itemTextBlock}>
-            <Text style={styles.itemTitle}>{preset.name}</Text>
-            <Text style={styles.itemMeta}>{preset.displayCount}</Text>
-          </View>
-          <ActionButton
-            icon="check"
-            label={t('apply')}
-            onPress={() => actions.applyPreset(preset.name)}
-            small
-          />
-          <ActionButton
-            icon="settings"
-            label={t('delete')}
-            onPress={() => actions.deletePreset(preset.name)}
-            small
-          />
-        </View>
-      ))}
+      {snapshot.presets.length > 0 ? (
+        <StableLegendList
+          data={snapshot.presets}
+          estimatedItemSize={58}
+          keyExtractor={(preset) => preset.name}
+          renderItem={({ item: preset }) => (
+            <View style={styles.itemHeader}>
+              <View style={styles.itemTextBlock}>
+                <Text style={styles.itemTitle}>{preset.name}</Text>
+                <Text style={styles.itemMeta}>{preset.displayCount}</Text>
+              </View>
+              <ActionButton
+                icon="check"
+                label={t('apply')}
+                onPress={() => actions.applyPreset(preset.name)}
+                small
+              />
+              <ActionButton
+                icon="settings"
+                label={t('delete')}
+                onPress={() => actions.deletePreset(preset.name)}
+                small
+              />
+            </View>
+          )}
+          scrollEnabled={snapshot.presets.length > 3}
+          style={[
+            styles.inlineList,
+            { height: inlineListHeight(snapshot.presets.length, 58) },
+          ]}
+        />
+      ) : null}
 
       <Text style={styles.itemTitle}>{t('syncLayout')}</Text>
       <View style={styles.inputRow}>
@@ -583,26 +628,38 @@ function AutomationPanel({
           onPress={actions.clearProtectedLayout}
         />
       </ActionRow>
-      {snapshot.syncGroups.map((group) => (
-        <View key={group.id} style={styles.itemHeader}>
-          <View style={styles.itemTextBlock}>
-            <Text style={styles.itemTitle}>{group.name}</Text>
-            <Text style={styles.itemMeta}>{group.displayIDs.length}</Text>
-          </View>
-          <ActionButton
-            icon="check"
-            label={t('apply')}
-            onPress={() => actions.applySyncGroup(group.id)}
-            small
-          />
-          <ActionButton
-            icon="settings"
-            label={t('delete')}
-            onPress={() => actions.deleteSyncGroup(group.id)}
-            small
-          />
-        </View>
-      ))}
+      {snapshot.syncGroups.length > 0 ? (
+        <StableLegendList
+          data={snapshot.syncGroups}
+          estimatedItemSize={58}
+          keyExtractor={(group) => group.id}
+          renderItem={({ item: group }) => (
+            <View style={styles.itemHeader}>
+              <View style={styles.itemTextBlock}>
+                <Text style={styles.itemTitle}>{group.name}</Text>
+                <Text style={styles.itemMeta}>{group.displayIDs.length}</Text>
+              </View>
+              <ActionButton
+                icon="check"
+                label={t('apply')}
+                onPress={() => actions.applySyncGroup(group.id)}
+                small
+              />
+              <ActionButton
+                icon="settings"
+                label={t('delete')}
+                onPress={() => actions.deleteSyncGroup(group.id)}
+                small
+              />
+            </View>
+          )}
+          scrollEnabled={snapshot.syncGroups.length > 3}
+          style={[
+            styles.inlineList,
+            { height: inlineListHeight(snapshot.syncGroups.length, 58) },
+          ]}
+        />
+      ) : null}
 
       <Text style={styles.itemTitle}>{t('appSettings')}</Text>
       <ActionRow>
@@ -699,12 +756,14 @@ function ActionRow({ children }: { children: ReactNode }) {
 }
 
 function ActionButton({
+  disabled,
   icon,
   label,
   onPress,
   selected,
   small,
 }: {
+  disabled?: boolean;
   icon?: IconName;
   label: string;
   onPress: () => void;
@@ -713,23 +772,31 @@ function ActionButton({
 }) {
   return (
     <Pressable
+      accessibilityState={{ disabled, selected }}
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.action,
         small && styles.actionSmall,
         selected && styles.actionSelected,
-        pressed && styles.actionPressed,
+        pressed && !disabled && styles.actionPressed,
+        disabled && styles.actionDisabled,
       ]}
     >
       {icon ? (
-        <Icon color={selected ? '#ffffff' : '#b2b6bd'} name={icon} size={13} />
+        <Icon
+          color={selected ? '#ffffff' : disabled ? '#656a76' : '#b2b6bd'}
+          name={icon}
+          size={13}
+        />
       ) : null}
       <Text
         style={[
           styles.actionText,
           icon && styles.actionTextWithIcon,
           selected && styles.actionTextSelected,
+          disabled && styles.actionTextDisabled,
         ]}
       >
         {label}
@@ -780,6 +847,10 @@ function positiveNumberFromInput(value: string, fallback: number) {
   }
 
   return parsed;
+}
+
+function inlineListHeight(itemCount: number, itemHeight: number) {
+  return Math.min(Math.max(itemCount, 1), 3) * itemHeight;
 }
 
 const inputOptions = [
@@ -864,9 +935,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 16,
   },
-  chipRow: {
-    flexDirection: 'row',
-    paddingRight: 8,
+  horizontalList: {
+    height: 44,
+    marginTop: 8,
+  },
+  inlineList: {
+    marginTop: 4,
   },
   chip: {
     backgroundColor: '#1f232b',
@@ -893,15 +967,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   notice: {
-    backgroundColor: 'rgba(255,207,37,0.12)',
-    borderColor: 'rgba(255,207,37,0.35)',
+    backgroundColor: '#1f232b',
+    borderColor: '#252830',
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 8,
     padding: 10,
   },
   noticeText: {
-    color: '#fbeabf',
+    color: '#b2b6bd',
     fontFamily: font.family,
     fontSize: 12,
     fontWeight: '600',
@@ -935,6 +1009,9 @@ const styles = StyleSheet.create({
   actionPressed: {
     backgroundColor: '#3b3d45',
   },
+  actionDisabled: {
+    opacity: 0.45,
+  },
   actionText: {
     color: '#b2b6bd',
     fontFamily: font.family,
@@ -944,6 +1021,9 @@ const styles = StyleSheet.create({
   },
   actionTextSelected: {
     color: '#ffffff',
+  },
+  actionTextDisabled: {
+    color: '#656a76',
   },
   actionTextWithIcon: {
     marginLeft: 5,

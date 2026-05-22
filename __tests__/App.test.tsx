@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Pressable, ScrollView } from 'react-native';
+import { Pressable, ScrollView, TextInput } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { vi } from 'vitest';
 
@@ -306,9 +306,11 @@ beforeEach(() => {
   hotUpdaterMocks.reload.mockResolvedValue(undefined);
   hotUpdaterMocks.updateBundle.mockReset();
   hotUpdaterMocks.updateBundle.mockResolvedValue(true);
+  vi.mocked(NativeDisplayControl!.setDisplayMode).mockClear();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -377,6 +379,124 @@ test('opens display dropdown and selects another display', async () => {
   expect(renderedText).toContain('Studio Display');
 });
 
+test('opens a searchable resolution overlay', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const trigger = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Current mode'));
+
+  await ReactTestRenderer.act(async () => {
+    trigger!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  let renderedText = normalizedText(renderer!.root);
+  expect(renderedText).toContain('Choose resolution');
+  expect(renderedText).toContain('1920 x 1200');
+
+  const searchInput = renderer!.root.findByType(TextInput);
+
+  await ReactTestRenderer.act(() => {
+    searchInput.props.onChangeText('1200');
+  });
+
+  renderedText = normalizedText(renderer!.root);
+  expect(renderedText).toContain('1920 x 1200');
+});
+
+test('asks to revert after selecting a new resolution', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const trigger = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Current mode'));
+
+  await ReactTestRenderer.act(async () => {
+    trigger!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const modeRow = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('1920 x 1200'));
+
+  await ReactTestRenderer.act(async () => {
+    modeRow!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(NativeDisplayControl!.setDisplayMode).toHaveBeenCalledWith(
+    '1',
+    '1920x1200@60x2',
+  );
+  expect(normalizedText(renderer!.root)).toContain(
+    'Return to the previous resolution?',
+  );
+
+  const revertButton = renderer!.root.findByProps({
+    accessibilityLabel: 'Return',
+  });
+
+  await ReactTestRenderer.act(async () => {
+    revertButton.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(NativeDisplayControl!.setDisplayMode).toHaveBeenCalledWith(
+    '1',
+    '3024x1964@120x2',
+  );
+});
+
+test('reverts resolution with Enter submit capture', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const trigger = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Current mode'));
+
+  await ReactTestRenderer.act(async () => {
+    trigger!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const modeRow = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('1920 x 1200'));
+
+  await ReactTestRenderer.act(async () => {
+    modeRow!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const keyboardInput = renderer!.root.findByProps({
+    submitBehavior: 'submit',
+  });
+
+  await ReactTestRenderer.act(async () => {
+    keyboardInput.props.onSubmitEditing();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(NativeDisplayControl!.setDisplayMode).toHaveBeenCalledWith(
+    '1',
+    '3024x1964@120x2',
+  );
+});
+
 test('advanced tab exposes low-level display operations only after selection', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
 
@@ -399,6 +519,69 @@ test('advanced tab exposes low-level display operations only after selection', a
   expect(renderedText).toContain('Extra brightness');
   expect(renderedText).toContain('UUID');
   expect(renderedText).toContain('Sync and layout');
+});
+
+test('disables display movement controls when only one display is connected', async () => {
+  const singleDisplaySnapshot = {
+    ...nativeSnapshot,
+    displays: [nativeSnapshot.displays[0]],
+  };
+
+  vi.mocked(NativeDisplayControl!.getSnapshot).mockReturnValueOnce(
+    singleDisplaySnapshot,
+  );
+  vi.mocked(NativeDisplayControl!.refreshSnapshot).mockReturnValueOnce(
+    singleDisplaySnapshot,
+  );
+
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const arrangeTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Arrange'));
+
+  await ReactTestRenderer.act(() => {
+    arrangeTab!.props.onPress();
+  });
+
+  const moveLeft = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Left'));
+
+  expect(moveLeft!.props.disabled).toBe(true);
+  expect(normalizedText(renderer!.root)).toContain(
+    'Display movement is available when two or more displays are connected.',
+  );
+});
+
+test('extra brightness actions call the native display control', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const enableExtraBrightness = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Enable'));
+
+  await ReactTestRenderer.act(() => {
+    enableExtraBrightness!.props.onPress();
+  });
+
+  expect(NativeDisplayControl!.enableXdrUpscale).toHaveBeenCalledWith('1');
 });
 
 test('maps system locale to supported app languages', () => {
@@ -461,8 +644,50 @@ test('checks and reloads a downloaded HotUpdater bundle', async () => {
   expect(hotUpdaterMocks.reload).toHaveBeenCalledTimes(1);
 });
 
+test('keeps the update action disabled for one minute when no update exists', async () => {
+  vi.useFakeTimers();
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const checkButton = renderer!.root.findByProps({
+    accessibilityLabel: 'Check for updates',
+  });
+
+  await ReactTestRenderer.act(async () => {
+    await checkButton.props.onPress();
+  });
+
+  const disabledButton = renderer!.root.findByProps({
+    accessibilityLabel: 'Up to date',
+  });
+
+  expect(disabledButton.props.disabled).toBe(true);
+
+  await ReactTestRenderer.act(async () => {
+    vi.advanceTimersByTime(60_000);
+  });
+
+  const reenabledButton = renderer!.root.findByProps({
+    accessibilityLabel: 'Check for updates',
+  });
+
+  expect(reenabledButton.props.disabled).toBe(false);
+
+  await ReactTestRenderer.act(() => {
+    renderer!.unmount();
+  });
+  vi.useRealTimers();
+});
+
 function instanceText(node: ReactTestRenderer.ReactTestInstance): string {
   return node.children
     .map((child) => (typeof child === 'string' ? child : instanceText(child)))
     .join(' ');
+}
+
+function normalizedText(node: ReactTestRenderer.ReactTestInstance): string {
+  return instanceText(node).replace(/\s+/g, ' ').trim();
 }

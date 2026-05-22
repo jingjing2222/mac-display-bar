@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { TranslationKey } from '../i18n/strings';
 import { useHotUpdate } from '../hooks/hotUpdate/useHotUpdate';
@@ -17,13 +17,23 @@ export function TopUpdateHeader({
 }) {
   const { canCheck, canReload, checkForUpdate, reloadUpdate, status } =
     useHotUpdate();
+  const isReloadAction = canReload;
+  const isActionEnabled = isReloadAction ? canReload : canCheck;
+  const actionLabel = buttonLabel(status, t);
+  const actionAccessibilityLabel = isReloadAction
+    ? t('updateApply')
+    : actionLabel;
 
   return (
     <View style={styles.header}>
       <View style={styles.titleBlock}>
         <View style={styles.appRow}>
           <View style={styles.appIcon}>
-            <Icon color="#ffffff" name="display" size={17} />
+            <Image
+              accessibilityIgnoresInvertColors
+              source={require('../../macos/com.jingjing2222.macdisplaybar-macOS/Assets.xcassets/AppIcon.appiconset/64.png')}
+              style={styles.appIconImage}
+            />
           </View>
           <View style={styles.appTextBlock}>
             <Text style={styles.appName}>{t('appName')}</Text>
@@ -46,49 +56,27 @@ export function TopUpdateHeader({
 
       <View style={styles.actions}>
         <Pressable
-          accessibilityLabel={t('updateCheck')}
+          accessibilityLabel={actionAccessibilityLabel}
           accessibilityRole="button"
-          disabled={!canCheck}
-          onPress={checkForUpdate}
+          disabled={!isActionEnabled}
+          onPress={isReloadAction ? reloadUpdate : checkForUpdate}
           style={({ pressed }) => [
             styles.button,
-            pressed && canCheck && styles.buttonPressed,
-            !canCheck && styles.buttonDisabled,
+            isReloadAction && styles.applyButton,
+            pressed && isActionEnabled && styles.buttonPressed,
+            !isActionEnabled && styles.buttonDisabled,
           ]}
         >
-          <Icon color="#ffffff" name="refresh" size={13} />
-          <Text style={styles.buttonText}>{checkLabel(status, t)}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel={t('updateApply')}
-          accessibilityRole="button"
-          disabled={!canReload}
-          onPress={reloadUpdate}
-          style={({ pressed }) => [
-            styles.button,
-            canReload && styles.applyButton,
-            pressed && canReload && styles.buttonPressed,
-            !canReload && styles.buttonDisabled,
-          ]}
-        >
-          <Icon color="#ffffff" name="download" size={13} />
-          <Text style={styles.buttonText}>{t('updateApply')}</Text>
+          <Icon
+            color="#ffffff"
+            name={isReloadAction ? 'download' : 'refresh'}
+            size={13}
+          />
+          <Text style={styles.buttonText}>{actionLabel}</Text>
         </Pressable>
       </View>
     </View>
   );
-}
-
-function checkLabel(status: string, t: (key: TranslationKey) => string) {
-  if (status === 'checking') {
-    return t('updateChecking');
-  }
-
-  if (status === 'downloading') {
-    return t('updateDownloading');
-  }
-
-  return t('updateCheck');
 }
 
 function updateLabel(status: string, t: (key: TranslationKey) => string) {
@@ -103,6 +91,23 @@ function updateLabel(status: string, t: (key: TranslationKey) => string) {
       return t('updateDownloading');
     default:
       return t('updateManual');
+  }
+}
+
+function buttonLabel(status: string, t: (key: TranslationKey) => string) {
+  switch (status) {
+    case 'ready':
+      return t('updateApply');
+    case 'up-to-date':
+      return t('updateCurrent');
+    case 'checking':
+      return t('updateChecking');
+    case 'downloading':
+      return t('updateDownloading');
+    case 'reloading':
+      return t('updateApply');
+    default:
+      return t('updateCheck');
   }
 }
 
@@ -126,11 +131,18 @@ const styles = StyleSheet.create({
   },
   appIcon: {
     alignItems: 'center',
-    backgroundColor: '#2b89ff',
+    backgroundColor: '#1f232b',
+    borderColor: 'rgba(178,182,189,0.1)',
     borderRadius: 8,
+    borderWidth: 1,
     height: 34,
     justifyContent: 'center',
     marginRight: 10,
+    overflow: 'hidden',
+    width: 34,
+  },
+  appIconImage: {
+    height: 34,
     width: 34,
   },
   appTextBlock: {
@@ -160,7 +172,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#00ca8e',
   },
   dotWarn: {
-    backgroundColor: '#ffcf25',
+    backgroundColor: '#b2b6bd',
   },
   statusText: {
     color: '#b2b6bd',

@@ -1,6 +1,6 @@
 import { HotUpdater } from '@hot-updater/react-native';
 
-const updateStrategy = 'appVersion' as const;
+const updateStrategy = 'fingerprint' as const;
 
 export type HotUpdateBundle = NonNullable<
   Awaited<ReturnType<typeof HotUpdater.checkForUpdate>>

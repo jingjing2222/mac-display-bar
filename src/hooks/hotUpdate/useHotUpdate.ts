@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   hotUpdaterApi,
@@ -20,12 +20,38 @@ const messageFromError = (error: unknown) =>
 const messageFromBundle = (bundle: HotUpdateBundle) =>
   bundle.message?.trim() || `Bundle ${bundle.id}`;
 
+const noUpdateCooldownMs = 60_000;
+
 export function useHotUpdate() {
   const [bundle, setBundle] = useState<HotUpdateBundle | null>(null);
   const [message, setMessage] = useState('Manual update check ready');
   const [status, setStatus] = useState<HotUpdateStatus>('idle');
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCooldown = useCallback(() => {
+    if (!cooldownRef.current) {
+      return;
+    }
+
+    clearTimeout(cooldownRef.current);
+    cooldownRef.current = null;
+  }, []);
+
+  const startNoUpdateCooldown = useCallback(() => {
+    clearCooldown();
+    cooldownRef.current = setTimeout(() => {
+      cooldownRef.current = null;
+      setMessage('Manual update check ready');
+      setStatus('idle');
+    }, noUpdateCooldownMs);
+  }, [clearCooldown]);
+
+  useEffect(() => {
+    return clearCooldown;
+  }, [clearCooldown]);
 
   const checkForUpdate = useCallback(async () => {
+    clearCooldown();
     setBundle(null);
     setMessage('Checking for update...');
     setStatus('checking');
@@ -40,6 +66,9 @@ export function useHotUpdate() {
       if (!updateBundle) {
         setMessage(reportedError ?? 'No update bundle found');
         setStatus(reportedError ? 'error' : 'up-to-date');
+        if (!reportedError) {
+          startNoUpdateCooldown();
+        }
         return;
       }
 
@@ -62,7 +91,7 @@ export function useHotUpdate() {
       setMessage(messageFromError(error));
       setStatus('error');
     }
-  }, []);
+  }, [clearCooldown, startNoUpdateCooldown]);
 
   const reloadUpdate = useCallback(async () => {
     if (status !== 'ready') {
@@ -85,7 +114,8 @@ export function useHotUpdate() {
     canCheck:
       status !== 'checking' &&
       status !== 'downloading' &&
-      status !== 'reloading',
+      status !== 'reloading' &&
+      status !== 'up-to-date',
     canReload: status === 'ready',
     checkForUpdate,
     message,

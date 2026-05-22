@@ -7,6 +7,20 @@ config({ path: '.env.hotupdater' });
 
 export default defineConfig({
   build: bare({ enableHermes: true }),
+  fingerprint: {
+    extraSources: [
+      'macos/com.jingjing2222.macdisplaybar.xcodeproj/project.pbxproj',
+      'macos/Podfile',
+      'macos/Podfile.lock',
+      'macos/PrivacyInfo.xcprivacy',
+    ],
+    ignorePaths: [
+      'macos/Pods/**/*',
+      'macos/build/**/*',
+      'macos/**/*.xcuserdata/**/*',
+      'macos/**/*.xcworkspace/xcuserdata/**/*',
+    ],
+  },
   storage: r2Storage({
     bucketName: process.env.HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME!,
     accountId: process.env.HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID!,
@@ -20,5 +34,5 @@ export default defineConfig({
     accountId: process.env.HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID!,
     cloudflareApiToken: process.env.HOT_UPDATER_CLOUDFLARE_API_TOKEN!,
   }),
-  updateStrategy: 'appVersion', // or "fingerprint"
+  updateStrategy: 'fingerprint',
 });
