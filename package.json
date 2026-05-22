@@ -1,10 +1,10 @@
 {
-  "name": "com.jingjing2222.macdisplaybar",
+  "name": "mac-display-bar",
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "react-native run-ios",
+    "macos": "react-native run-macos",
+    "build:macos": "react-native build-macos",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"
@@ -13,6 +13,7 @@
     "@react-native/new-app-screen": "0.81.6",
     "react": "19.1.4",
     "react-native": "0.81.6",
+    "react-native-macos": "^0.81.0-0",
     "react-native-safe-area-context": "^5.5.2"
   },
   "devDependencies": {
@@ -20,8 +21,6 @@
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "20.0.0",
-    "@react-native-community/cli-platform-android": "20.0.0",
-    "@react-native-community/cli-platform-ios": "20.0.0",
     "@react-native/babel-preset": "0.81.6",
     "@react-native/eslint-config": "0.81.6",
     "@react-native/metro-config": "0.81.6",
@@ -38,5 +37,5 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "yarn@3.6.4"
+  "packageManager": "yarn@4.13.0"
 }
