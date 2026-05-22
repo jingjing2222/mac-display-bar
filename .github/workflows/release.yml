@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - macos/com.jingjing2222.macdisplaybar-macOS/Info.plist
   workflow_dispatch:
 
 concurrency:

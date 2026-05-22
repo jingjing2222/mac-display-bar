@@ -334,6 +334,36 @@ test('custom resolution drafts follow current mode snapshot changes', () => {
   expect(displayControlPanel).toContain('display.id');
 });
 
+test('generated HiDPI selections install overrides and do not fall back to standard scale modes', () => {
+  const generatedHiDpiApplyMethod = displayCore.slice(
+    displayCore.indexOf('- (BOOL)applyAvailableHiDpiModeForDisplayID:'),
+    displayCore.indexOf('- (void)applyDisplayOriginForDisplayID:'),
+  );
+  const generatedModeBranch = displayCore.slice(
+    displayCore.indexOf('- (BOOL)applyDisplayModeForDisplayID:'),
+    displayCore.indexOf('- (BOOL)applyAvailableHiDpiModeForDisplayID:'),
+  );
+
+  expect(displayCore).toContain('generatedHiDpiModeComponentsFromModeID');
+  expect(displayCore).toContain('applyAvailableHiDpiModeForDisplayID');
+  expect(displayCore).toContain('installOverrideBundleAtPath');
+  expect(displayCore).toContain('with administrator privileges');
+  expect(displayCore).toContain('RCTDisplayOverrideInstallDirectory');
+  expect(generatedModeBranch).toContain(
+    'installOverrideBundleAtPath:bundlePath',
+  );
+  expect(generatedModeBranch).toContain('!didApplyMode && didInstallBundle');
+  expect(generatedModeBranch).toContain('attempt < 3 && !didApplyMode');
+  expect(generatedHiDpiApplyMethod).toContain(
+    'CGDisplaySetDisplayMode(displayID, hiDpiMode, NULL)',
+  );
+  expect(displayCore).toContain('HiDPI settings installed');
+  expect(displayCore).not.toContain('GeneratedHiDpiOverlay');
+  expect(displayCore).not.toContain('install required');
+  expect(generatedHiDpiApplyMethod).not.toContain('allowStandardFallback');
+  expect(generatedHiDpiApplyMethod).not.toContain('fallbackMode');
+});
+
 test('display snapshots do not mutate AppKit dimming windows', () => {
   const displayDictionaryMethod = displayCore.slice(
     displayCore.indexOf('- (NSDictionary *)dictionaryForDisplay:'),

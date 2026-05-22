@@ -9,6 +9,14 @@ export default defineConfig({
   build: bare({ enableHermes: true }),
   fingerprint: {
     extraSources: [
+      'macos/com.jingjing2222.macdisplaybar-macOS/AppDelegate.h',
+      'macos/com.jingjing2222.macdisplaybar-macOS/AppDelegate.mm',
+      'macos/com.jingjing2222.macdisplaybar-macOS/Base.lproj/Main.storyboard',
+      'macos/com.jingjing2222.macdisplaybar-macOS/DisplayCore',
+      'macos/com.jingjing2222.macdisplaybar-macOS/NativeDisplayControl',
+      'macos/com.jingjing2222.macdisplaybar-macOS/NativeFoo',
+      'macos/com.jingjing2222.macdisplaybar-macOS/com.jingjing2222.macdisplaybar.entitlements',
+      'macos/com.jingjing2222.macdisplaybar-macOS/main.m',
       'macos/com.jingjing2222.macdisplaybar.xcodeproj/project.pbxproj',
       'macos/Podfile',
       'macos/Podfile.lock',
