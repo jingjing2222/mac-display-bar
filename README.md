@@ -23,11 +23,8 @@ Some controls depend on macOS, the connected display, cable type, and monitor fi
 
 ### Homebrew
 
-After the cask is published:
-
 ```sh
-brew tap jingjing2222/tap
-brew install --cask mac-display-bar
+brew install --cask jingjing2222/tap/mac-display-bar
 ```
 
 Then launch `macDisplayBar` from Applications. The app runs in the menu bar.
