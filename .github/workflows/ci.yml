@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, Test, Fingerprint, Build
+    runs-on: macos-15
+    env:
+      HOT_UPDATER_BASE_URL: https://example.invalid
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install JavaScript dependencies
+        run: yarn install --immutable
+
+      - name: Write CI hot-updater env
+        run: |
+          {
+            echo "HOT_UPDATER_BASE_URL=https://example.invalid"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME=ci"
+            echo "HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID=ci"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID=ci"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY=ci"
+            echo "HOT_UPDATER_CLOUDFLARE_D1_DATABASE_ID=ci"
+            echo "HOT_UPDATER_CLOUDFLARE_API_TOKEN=ci"
+          } > .env.hotupdater
+
+      - name: Install CocoaPods dependencies
+        run: pod install --project-directory=macos
+
+      - name: Format
+        run: yarn format:check
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Test
+        run: yarn test
+
+      - name: Font check
+        run: yarn check:fonts
+
+      - name: Fingerprint is fresh
+        run: |
+          yarn fingerprint:create
+          if ! git diff --exit-code -- fingerprint.json; then
+            echo "::error::fingerprint.json is stale. Run yarn fingerprint:create and commit the result."
+            exit 1
+          fi
+
+      - name: Build macOS app
+        run: |
+          xcodebuild \
+            -workspace macos/com.jingjing2222.macdisplaybar.xcworkspace \
+            -scheme com.jingjing2222.macdisplaybar-macOS \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            build

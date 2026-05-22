@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Homebrew Cask
+    runs-on: macos-15
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect macOS app version change
+        id: version
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: node scripts/ci/detect-release-version.mjs
+
+      - name: Stop when version unchanged
+        if: steps.version.outputs.version_changed != 'true'
+        run: echo "macOS app version unchanged. Release skipped."
+
+      - name: Setup Node
+        if: steps.version.outputs.version_changed == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Enable Corepack
+        if: steps.version.outputs.version_changed == 'true'
+        run: corepack enable
+
+      - name: Install JavaScript dependencies
+        if: steps.version.outputs.version_changed == 'true'
+        run: yarn install --immutable
+
+      - name: Write release hot-updater env
+        if: steps.version.outputs.version_changed == 'true'
+        run: |
+          {
+            echo "HOT_UPDATER_BASE_URL=${{ secrets.HOT_UPDATER_BASE_URL }}"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME=${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME }}"
+            echo "HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID=${{ secrets.HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID }}"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID=${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID }}"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY=${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY }}"
+            echo "HOT_UPDATER_CLOUDFLARE_D1_DATABASE_ID=${{ secrets.HOT_UPDATER_CLOUDFLARE_D1_DATABASE_ID }}"
+            echo "HOT_UPDATER_CLOUDFLARE_API_TOKEN=${{ secrets.HOT_UPDATER_CLOUDFLARE_API_TOKEN }}"
+          } > .env.hotupdater
+
+      - name: Install CocoaPods dependencies
+        if: steps.version.outputs.version_changed == 'true'
+        run: pod install --project-directory=macos
+
+      - name: Validate release version
+        if: steps.version.outputs.version_changed == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: node scripts/ci/assert-release-version.mjs
+
+      - name: Ensure fingerprint is fresh
+        if: steps.version.outputs.version_changed == 'true'
+        run: |
+          yarn fingerprint:create
+          if ! git diff --exit-code -- fingerprint.json; then
+            echo "::error::fingerprint.json is stale. Run yarn fingerprint:create and commit the result."
+            exit 1
+          fi
+
+      - name: Ensure release tag is new
+        if: steps.version.outputs.version_changed == 'true'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.version.outputs.tag }}"; then
+            echo "::error::Tag ${{ steps.version.outputs.tag }} already exists."
+            exit 1
+          fi
+
+      - name: Build Release app
+        if: steps.version.outputs.version_changed == 'true'
+        run: |
+          xcodebuild \
+            -workspace macos/com.jingjing2222.macdisplaybar.xcworkspace \
+            -scheme com.jingjing2222.macdisplaybar-macOS \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            SYMROOT="$PWD/dist/homebrew/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Sign and notarize
+        if: steps.version.outputs.version_changed == 'true'
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          DEVELOPER_ID_PROVISIONING_PROFILE_BASE64: ${{ secrets.DEVELOPER_ID_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: bash scripts/ci/sign-notarize-macos.sh
+
+      - name: Create GitHub release
+        if: steps.version.outputs.version_changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "${{ steps.package.outputs.zip_path }}" \
+            --title "macDisplayBar ${{ steps.version.outputs.version }}" \
+            --notes "Homebrew release for macDisplayBar ${{ steps.version.outputs.version }}."
+
+      - name: Checkout Homebrew tap
+        if: steps.version.outputs.version_changed == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: jingjing2222/homebrew-tap
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update Homebrew cask
+        if: steps.version.outputs.version_changed == 'true'
+        run: |
+          node scripts/ci/update-homebrew-cask.mjs \
+            homebrew-tap/Casks/mac-display-bar.rb \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.package.outputs.sha256 }}"
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/mac-display-bar.rb
+          git commit -m "Update macDisplayBar cask to ${{ steps.version.outputs.version }}"
+          git push
+
+      - name: Verify Homebrew cask
+        if: steps.version.outputs.version_changed == 'true'
+        run: |
+          brew tap jingjing2222/tap
+          brew audit --cask --strict jingjing2222/tap/mac-display-bar
+          brew install --cask jingjing2222/tap/mac-display-bar
+          spctl --assess --type execute --verbose=4 /Applications/macDisplayBar.app

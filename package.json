@@ -8,6 +8,8 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check:fonts": "node scripts/check-inter-font-family.mjs",
+    "typecheck": "tsc --noEmit",
+    "fingerprint:create": "hot-updater fingerprint create",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "start": "react-native start",
