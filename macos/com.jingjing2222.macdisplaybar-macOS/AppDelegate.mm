@@ -43,6 +43,10 @@
                                            selector:@selector(closeStatusPopover:)
                                                name:NSApplicationDidResignActiveNotification
                                              object:NSApp];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(handleScreenParametersChanged:)
+                                               name:NSApplicationDidChangeScreenParametersNotification
+                                             object:NSApp];
 
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:28.0];
   NSStatusBarButton *button = self.statusItem.button;
@@ -79,10 +83,7 @@
     return;
   }
 
-  [self.statusPopover showRelativeToRect:button.bounds
-                                  ofView:button
-                           preferredEdge:NSRectEdgeMinY];
-  [self installOutsideClickMonitor];
+  [self showStatusPopoverAnchoredToStatusItem];
 }
 
 - (void)closeStatusPopover:(id)sender
@@ -92,6 +93,46 @@
   }
 
   [self uninstallOutsideClickMonitor];
+}
+
+- (void)showStatusPopoverAnchoredToStatusItem
+{
+  NSStatusBarButton *button = self.statusItem.button;
+
+  if (button == nil || button.window == nil) {
+    return;
+  }
+
+  [self.statusPopover showRelativeToRect:button.bounds
+                                  ofView:button
+                           preferredEdge:NSRectEdgeMinY];
+  [self installOutsideClickMonitor];
+}
+
+- (void)handleScreenParametersChanged:(NSNotification *)notification
+{
+  [self repositionStatusPopoverAfterDelay:0.10];
+  [self repositionStatusPopoverAfterDelay:0.35];
+}
+
+- (void)repositionStatusPopoverAfterDelay:(NSTimeInterval)delay
+{
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    [self repositionStatusPopoverIfShown];
+  });
+}
+
+- (void)repositionStatusPopoverIfShown
+{
+  if (!self.statusPopover.shown) {
+    return;
+  }
+
+  BOOL animates = self.statusPopover.animates;
+  self.statusPopover.animates = NO;
+  [self.statusPopover close];
+  [self showStatusPopoverAnchoredToStatusItem];
+  self.statusPopover.animates = animates;
 }
 
 - (void)installOutsideClickMonitor

@@ -15,6 +15,7 @@ import { StableLegendList } from './StableLegendList';
 const font = {
   family: 'Inter',
 } as const;
+const generatedHiDpiModePrefix = 'generated-hidpi:';
 
 export function ResolutionPicker({
   display,
@@ -39,6 +40,11 @@ export function ResolutionPicker({
 
     const previousMode = display.currentMode;
     onSelect(modeID);
+
+    if (modeID.startsWith(generatedHiDpiModePrefix)) {
+      return;
+    }
+
     openRevertOverlay({
       onRevert: () => onSelect(previousMode.id),
       previousMode,

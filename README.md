@@ -10,6 +10,7 @@ It is built for people who switch resolutions often, manage multiple monitors, o
 - Display picker for switching between connected monitors
 - Brightness and dimming controls
 - Resolution picker with search, filters, HiDPI labels, and favorites
+- Automatic HiDPI candidates for exposed resolutions at the highest refresh rate
 - 30-second revert prompt after resolution changes
 - HDR, color, and extra brightness controls where supported
 - Display arrangement controls for multi-monitor setups
@@ -18,6 +19,8 @@ It is built for people who switch resolutions often, manage multiple monitors, o
 - Korean and English UI text
 
 Some controls depend on macOS, the connected display, cable type, and monitor firmware. Unsupported controls are hidden or disabled where possible.
+
+When macOS exposes a resolution without a matching HiDPI option, macDisplayBar shows an additional HiDPI candidate for that resolution using the highest available refresh rate. Selecting one creates the matching display override settings file; macOS may require installing that override and restarting the display session before the new mode becomes selectable.
 
 ## Install
 

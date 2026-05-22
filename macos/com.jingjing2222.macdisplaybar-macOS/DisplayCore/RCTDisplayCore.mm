@@ -12,6 +12,7 @@ extern "C" {
 }
 
 #include <vector>
+#include <arpa/inet.h>
 #include <float.h>
 #include <math.h>
 #include <sys/sysctl.h>
@@ -36,6 +37,7 @@ static NSString *const RCTDisplayRotationStatusDefaultsKey = @"displayRotationSt
 static NSString *const RCTDisplayOverrideBundlePathsDefaultsKey = @"displayOverrideBundlePaths";
 static NSString *const RCTDisplayOverrideBundleStatusDefaultsKey = @"displayOverrideBundleStatus";
 static NSString *const RCTDisplaySettingsDefaultsKey = @"displaySettings";
+static NSString *const RCTGeneratedHiDpiModeIDPrefix = @"generated-hidpi";
 static const uint8_t RCTDdcDestinationAddress = 0x6E;
 static const uint8_t RCTDdcReplyAddress = 0x6F;
 static const uint8_t RCTDdcHostAddress = 0x51;
@@ -136,6 +138,12 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *overrideBundlePaths;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *overrideBundleStatus;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *settings;
+
+- (void)saveCustomResolutionIfNeededForDisplayID:(NSString *)displayID
+                                           width:(double)width
+                                          height:(double)height
+                                     refreshRate:(double)refreshRate
+                                         isHiDpi:(BOOL)isHiDpi;
 
 @end
 
@@ -525,20 +533,11 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
                           refreshRate:(double)refreshRate
                               isHiDpi:(BOOL)isHiDpi
 {
-  NSDictionary *request = @{
-    @"id" : [[NSUUID UUID] UUIDString],
-    @"width" : @(MAX(width, 1)),
-    @"height" : @(MAX(height, 1)),
-    @"refreshRate" : @(MAX(refreshRate, 0)),
-    @"isHiDpi" : @(isHiDpi),
-    @"status" : @"Queued for override",
-  };
-  NSMutableArray<NSDictionary *> *requests = [self.customResolutionRequests[displayID] mutableCopy] ?: [NSMutableArray new];
-  [requests addObject:request];
-  self.customResolutionRequests[displayID] = requests;
-  [self recordAdvancedOperation:@"Custom resolution request saved" displayID:displayID];
-  [[NSUserDefaults standardUserDefaults] setObject:self.customResolutionRequests
-                                            forKey:RCTDisplayCustomResolutionsDefaultsKey];
+  [self saveCustomResolutionIfNeededForDisplayID:displayID
+                                           width:width
+                                          height:height
+                                     refreshRate:refreshRate
+                                         isHiDpi:isHiDpi];
 
   return [self stubbedSnapshot];
 }
@@ -556,6 +555,43 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
                                             forKey:RCTDisplayCustomResolutionsDefaultsKey];
 
   return [self stubbedSnapshot];
+}
+
+- (void)saveCustomResolutionIfNeededForDisplayID:(NSString *)displayID
+                                           width:(double)width
+                                          height:(double)height
+                                     refreshRate:(double)refreshRate
+                                         isHiDpi:(BOOL)isHiDpi
+{
+  double normalizedWidth = MAX(width, 1);
+  double normalizedHeight = MAX(height, 1);
+  double normalizedRefreshRate = MAX(refreshRate, 0);
+  NSMutableArray<NSDictionary *> *requests = [self.customResolutionRequests[displayID] mutableCopy] ?: [NSMutableArray new];
+
+  for (NSDictionary *request in requests) {
+    BOOL sameWidth = llround([request[@"width"] doubleValue]) == llround(normalizedWidth);
+    BOOL sameHeight = llround([request[@"height"] doubleValue]) == llround(normalizedHeight);
+    BOOL sameRefreshRate = llround([request[@"refreshRate"] doubleValue]) == llround(normalizedRefreshRate);
+    BOOL sameScale = [request[@"isHiDpi"] boolValue] == isHiDpi;
+
+    if (sameWidth && sameHeight && sameRefreshRate && sameScale) {
+      return;
+    }
+  }
+
+  NSDictionary *request = @{
+    @"id" : [[NSUUID UUID] UUIDString],
+    @"width" : @(normalizedWidth),
+    @"height" : @(normalizedHeight),
+    @"refreshRate" : @(normalizedRefreshRate),
+    @"isHiDpi" : @(isHiDpi),
+    @"status" : @"Queued for override",
+  };
+  [requests addObject:request];
+  self.customResolutionRequests[displayID] = requests;
+  [self recordAdvancedOperation:@"Custom resolution request saved" displayID:displayID];
+  [[NSUserDefaults standardUserDefaults] setObject:self.customResolutionRequests
+                                            forKey:RCTDisplayCustomResolutionsDefaultsKey];
 }
 
 - (NSDictionary *)queueEdidOverride:(NSString *)displayID
@@ -1336,6 +1372,11 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     @"LastOperation" : self.advancedOperations[displayID] ?: @"",
     @"LastOperationAt" : self.advancedOperationDates[displayID] ?: @"",
   } mutableCopy];
+  NSArray<NSData *> *scaleResolutions = [self scaleResolutionsForCustomResolutions:customResolutions];
+
+  if (scaleResolutions.count > 0) {
+    manifest[@"scale-resolutions"] = scaleResolutions;
+  }
 
   if (edidData.length > 0) {
     manifest[@"IODisplayEDID"] = edidData;
@@ -1353,6 +1394,47 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
   BOOL didWrite = [plistData writeToURL:fileURL atomically:YES];
   return didWrite ? fileURL.path : @"";
+}
+
+- (NSArray<NSData *> *)scaleResolutionsForCustomResolutions:(NSArray<NSDictionary *> *)customResolutions
+{
+  NSMutableArray<NSData *> *scaleResolutions = [NSMutableArray new];
+  NSMutableSet<NSData *> *seenResolutions = [NSMutableSet new];
+
+  for (NSDictionary *resolution in customResolutions) {
+    NSUInteger width = [resolution[@"width"] unsignedIntegerValue];
+    NSUInteger height = [resolution[@"height"] unsignedIntegerValue];
+
+    if (width == 0 || height == 0) {
+      continue;
+    }
+
+    if ([resolution[@"isHiDpi"] boolValue]) {
+      width *= 2;
+      height *= 2;
+    }
+
+    NSData *data = [self scaleResolutionDataWithWidth:width height:height];
+
+    if ([seenResolutions containsObject:data]) {
+      continue;
+    }
+
+    [seenResolutions addObject:data];
+    [scaleResolutions addObject:data];
+  }
+
+  return scaleResolutions;
+}
+
+- (NSData *)scaleResolutionDataWithWidth:(NSUInteger)width height:(NSUInteger)height
+{
+  uint32_t encodedResolution[2] = {
+    htonl((uint32_t)MIN(width, UINT32_MAX)),
+    htonl((uint32_t)MIN(height, UINT32_MAX)),
+  };
+
+  return [NSData dataWithBytes:encodedResolution length:sizeof(encodedResolution)];
 }
 
 - (double)normalizedRotation:(double)rotation
@@ -1386,6 +1468,8 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   NSArray *modes = CFBridgingRelease(copiedModes);
   NSMutableArray<NSDictionary *> *modeDictionaries = [NSMutableArray arrayWithCapacity:modes.count];
   NSMutableSet<NSString *> *seenModeIDs = [NSMutableSet new];
+  NSMutableSet<NSString *> *seenHiDpiResolutionKeys = [NSMutableSet new];
+  NSMutableDictionary<NSString *, NSDictionary *> *bestStandardModeByResolution = [NSMutableDictionary new];
   NSString *displayIDString = [NSString stringWithFormat:@"%u", displayID];
 
   for (id item in modes) {
@@ -1400,6 +1484,48 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     NSMutableDictionary *modeDictionary = [[self dictionaryForMode:candidate currentModeID:currentModeID] mutableCopy];
     modeDictionary[@"isFavorite"] = @([self modeIDIsFavorite:modeID displayIDString:displayIDString]);
     [modeDictionaries addObject:modeDictionary];
+
+    NSString *resolutionKey = [self resolutionKeyForWidth:[modeDictionary[@"width"] unsignedIntegerValue]
+                                                   height:[modeDictionary[@"height"] unsignedIntegerValue]];
+
+    if ([modeDictionary[@"isHiDpi"] boolValue]) {
+      [seenHiDpiResolutionKeys addObject:resolutionKey];
+      continue;
+    }
+
+    NSDictionary *bestMode = bestStandardModeByResolution[resolutionKey];
+
+    if (bestMode == nil || [modeDictionary[@"refreshRate"] doubleValue] > [bestMode[@"refreshRate"] doubleValue]) {
+      bestStandardModeByResolution[resolutionKey] = modeDictionary;
+    }
+  }
+
+  for (NSString *resolutionKey in bestStandardModeByResolution) {
+    if ([seenHiDpiResolutionKeys containsObject:resolutionKey]) {
+      continue;
+    }
+
+    NSDictionary *mode = bestStandardModeByResolution[resolutionKey];
+    NSUInteger width = [mode[@"width"] unsignedIntegerValue];
+    NSUInteger height = [mode[@"height"] unsignedIntegerValue];
+    double refreshRate = [mode[@"refreshRate"] doubleValue];
+    NSString *modeID = [self generatedHiDpiModeIDWithWidth:width height:height refreshRate:refreshRate];
+
+    if ([seenModeIDs containsObject:modeID]) {
+      continue;
+    }
+
+    [seenModeIDs addObject:modeID];
+    [modeDictionaries addObject:@{
+      @"id" : modeID,
+      @"width" : @(width),
+      @"height" : @(height),
+      @"refreshRate" : @(refreshRate),
+      @"isHiDpi" : @YES,
+      @"isCurrent" : @NO,
+      @"isFavorite" : @([self modeIDIsFavorite:modeID displayIDString:displayIDString]),
+      @"requiresOverride" : @YES,
+    }];
   }
 
   [modeDictionaries sortUsingComparator:^NSComparisonResult(NSDictionary *left, NSDictionary *right) {
@@ -1411,6 +1537,8 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     NSNumber *rightHeight = right[@"height"];
     NSNumber *leftRefreshRate = left[@"refreshRate"];
     NSNumber *rightRefreshRate = right[@"refreshRate"];
+    NSNumber *leftHiDpi = left[@"isHiDpi"];
+    NSNumber *rightHiDpi = right[@"isHiDpi"];
 
     if (leftFavorite.boolValue != rightFavorite.boolValue) {
       return leftFavorite.boolValue ? NSOrderedAscending : NSOrderedDescending;
@@ -1426,6 +1554,10 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
     if (leftRefreshRate.doubleValue != rightRefreshRate.doubleValue) {
       return leftRefreshRate.doubleValue > rightRefreshRate.doubleValue ? NSOrderedAscending : NSOrderedDescending;
+    }
+
+    if (leftHiDpi.boolValue != rightHiDpi.boolValue) {
+      return leftHiDpi.boolValue ? NSOrderedAscending : NSOrderedDescending;
     }
 
     return NSOrderedSame;
@@ -1469,10 +1601,75 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
                                     CGDisplayModeGetRefreshRate(mode)];
 }
 
+- (NSString *)resolutionKeyForWidth:(NSUInteger)width height:(NSUInteger)height
+{
+  return [NSString stringWithFormat:@"%lu:%lu", (unsigned long)width, (unsigned long)height];
+}
+
+- (NSString *)generatedHiDpiModeIDWithWidth:(NSUInteger)width height:(NSUInteger)height refreshRate:(double)refreshRate
+{
+  return [NSString stringWithFormat:@"%@:%lu:%lu:%.3f",
+                                    RCTGeneratedHiDpiModeIDPrefix,
+                                    (unsigned long)width,
+                                    (unsigned long)height,
+                                    refreshRate];
+}
+
+- (NSDictionary *)generatedHiDpiModeComponentsFromModeID:(NSString *)modeID
+{
+  NSArray<NSString *> *components = [modeID componentsSeparatedByString:@":"];
+
+  if (components.count != 4 || ![components[0] isEqualToString:RCTGeneratedHiDpiModeIDPrefix]) {
+    return nil;
+  }
+
+  NSUInteger width = (NSUInteger)components[1].integerValue;
+  NSUInteger height = (NSUInteger)components[2].integerValue;
+  double refreshRate = components[3].doubleValue;
+
+  if (width == 0 || height == 0) {
+    return nil;
+  }
+
+  return @{
+    @"width" : @(width),
+    @"height" : @(height),
+    @"refreshRate" : @(refreshRate),
+  };
+}
+
 - (BOOL)applyDisplayModeForDisplayID:(CGDirectDisplayID)displayID
                                modeID:(NSString *)modeID
                       displayIDString:(NSString *)displayIDString
 {
+  NSDictionary *generatedHiDpiMode = [self generatedHiDpiModeComponentsFromModeID:modeID];
+
+  if (generatedHiDpiMode != nil) {
+    [self saveCustomResolutionIfNeededForDisplayID:displayIDString
+                                             width:[generatedHiDpiMode[@"width"] doubleValue]
+                                            height:[generatedHiDpiMode[@"height"] doubleValue]
+                                       refreshRate:[generatedHiDpiMode[@"refreshRate"] doubleValue]
+                                           isHiDpi:YES];
+    NSString *bundlePath = [self writeOverrideBundleForDisplayIDString:displayIDString];
+
+    if (bundlePath.length > 0) {
+      self.overrideBundlePaths[displayIDString] = bundlePath;
+      self.overrideBundleStatus[displayIDString] = @"Bundle written";
+      self.modeStatus[displayIDString] = @"HiDPI settings file created";
+      self.modeErrors[displayIDString] = bundlePath;
+      [[NSUserDefaults standardUserDefaults] setObject:self.overrideBundlePaths
+                                                forKey:RCTDisplayOverrideBundlePathsDefaultsKey];
+      [[NSUserDefaults standardUserDefaults] setObject:self.overrideBundleStatus
+                                                forKey:RCTDisplayOverrideBundleStatusDefaultsKey];
+      [self recordAdvancedOperation:@"Generated HiDPI settings file written" displayID:displayIDString];
+      return YES;
+    }
+
+    self.modeStatus[displayIDString] = @"Failed";
+    self.modeErrors[displayIDString] = @"HiDPI settings file write failed";
+    return NO;
+  }
+
   NSDictionary *options = @{(__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes : @YES};
   CFArrayRef copiedModes = CGDisplayCopyAllDisplayModes(displayID, (__bridge CFDictionaryRef)options);
 
