@@ -352,6 +352,8 @@ test('generated HiDPI selections install overrides and do not fall back to stand
   expect(generatedModeBranch).toContain(
     'installOverrideBundleAtPath:bundlePath',
   );
+  expect(generatedModeBranch).toContain('!didApplyMode && didInstallBundle');
+  expect(generatedModeBranch).toContain('attempt < 3 && !didApplyMode');
   expect(generatedHiDpiApplyMethod).toContain(
     'CGDisplaySetDisplayMode(displayID, hiDpiMode, NULL)',
   );

@@ -1762,6 +1762,20 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
       [self recordAdvancedOperation:didInstallBundle ? @"Generated HiDPI settings installed"
                                                      : @"Generated HiDPI settings install failed"
                          displayID:displayIDString];
+
+      if (!didApplyMode && didInstallBundle) {
+        for (NSUInteger attempt = 0; attempt < 3 && !didApplyMode; attempt++) {
+          if (attempt > 0) {
+            [NSThread sleepForTimeInterval:0.25];
+          }
+
+          didApplyMode = [self applyAvailableHiDpiModeForDisplayID:displayID
+                                                             width:width
+                                                            height:height
+                                                       refreshRate:refreshRate
+                                                             error:&applyError];
+        }
+      }
     }
 
     if (didApplyMode) {
