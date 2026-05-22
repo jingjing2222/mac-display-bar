@@ -44,6 +44,8 @@ static NSString *const RCTDisplayPrivilegedInstallWillBeginNotification =
     @"RCTDisplayPrivilegedInstallWillBeginNotification";
 static NSString *const RCTDisplayPrivilegedInstallDidEndNotification =
     @"RCTDisplayPrivilegedInstallDidEndNotification";
+static const NSUInteger RCTDisplay4KWidth = 3840;
+static const NSUInteger RCTDisplay4KHeight = 2160;
 static const uint8_t RCTDdcDestinationAddress = 0x6E;
 static const uint8_t RCTDdcReplyAddress = 0x6F;
 static const uint8_t RCTDdcHostAddress = 0x51;
@@ -1616,54 +1618,40 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
                                            width:(NSUInteger)width
                                           height:(NSUInteger)height
 {
-  NSArray<NSNumber *> *res1Ratios = @[
+  NSArray<NSNumber *> *ratios = @[
     @1.0,
     @1.25,
     @(4.0 / 3.0),
     @(16.0 / 11.0),
     @(16.0 / 9.0),
     @2.0,
-  ];
-  NSArray<NSNumber *> *res2Ratios = @[
-    @2.0,
     @(8.0 / 3.0),
   ];
-  NSArray<NSNumber *> *res3Ratios = @[
-    @(8.0 / 3.0),
-  ];
-  NSArray<NSNumber *> *res4Ratios = @[
-    @1.25,
-    @(4.0 / 3.0),
-    @(16.0 / 11.0),
-    @(16.0 / 9.0),
-    @2.0,
-    @(8.0 / 3.0),
-  ];
+  NSArray<NSArray<NSNumber *> *> *suffixFamilies = [self oneKeyHiDpiSuffixFamilies];
 
-  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
-                                            seen:seenResolutions
-                                           width:width
-                                          height:height
-                                          ratios:res1Ratios
-                                     suffixBytes:@[ @0x00 ]];
-  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
-                                            seen:seenResolutions
-                                           width:width
-                                          height:height
-                                          ratios:res2Ratios
-                                     suffixBytes:@[ @0x00, @0x00, @0x00, @0x01, @0x00, @0x20, @0x00, @0x00 ]];
-  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
-                                            seen:seenResolutions
-                                           width:width
-                                          height:height
-                                          ratios:res3Ratios
-                                     suffixBytes:@[ @0x00, @0x00, @0x00, @0x01 ]];
-  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
-                                            seen:seenResolutions
-                                           width:width
-                                          height:height
-                                          ratios:res4Ratios
-                                     suffixBytes:@[ @0x00, @0x00, @0x00, @0x09, @0x00, @0xa0, @0x00, @0x00 ]];
+  for (NSArray<NSNumber *> *suffixBytes in suffixFamilies) {
+    [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
+                                              seen:seenResolutions
+                                             width:width
+                                            height:height
+                                            ratios:ratios
+                                       suffixBytes:suffixBytes];
+    [self appendNearNativeHiDpiScaleResolutionsToArray:scaleResolutions
+                                                  seen:seenResolutions
+                                                 width:width
+                                                height:height
+                                           suffixBytes:suffixBytes];
+  }
+}
+
+- (NSArray<NSArray<NSNumber *> *> *)oneKeyHiDpiSuffixFamilies
+{
+  return @[
+    @[ @0x00 ],
+    @[ @0x00, @0x00, @0x00, @0x01, @0x00, @0x20, @0x00, @0x00 ],
+    @[ @0x00, @0x00, @0x00, @0x01 ],
+    @[ @0x00, @0x00, @0x00, @0x09, @0x00, @0xa0, @0x00, @0x00 ],
+  ];
 }
 
 - (void)appendOneKeyHiDpiScaleResolutionsToArray:(NSMutableArray<NSData *> *)scaleResolutions
@@ -1677,6 +1665,40 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     double ratio = ratioValue.doubleValue;
     NSUInteger logicalWidth = (NSUInteger)llround((double)width / ratio);
     NSUInteger logicalHeight = (NSUInteger)llround((double)height / ratio);
+
+    if (logicalWidth == 0 || logicalHeight == 0) {
+      continue;
+    }
+
+    NSData *data = [self oneKeyHiDpiScaleResolutionDataWithLogicalWidth:logicalWidth
+                                                           logicalHeight:logicalHeight
+                                                             suffixBytes:suffixBytes];
+
+    if ([seenResolutions containsObject:data]) {
+      continue;
+    }
+
+    [seenResolutions addObject:data];
+    [scaleResolutions addObject:data];
+  }
+}
+
+- (void)appendNearNativeHiDpiScaleResolutionsToArray:(NSMutableArray<NSData *> *)scaleResolutions
+                                                seen:(NSMutableSet<NSData *> *)seenResolutions
+                                               width:(NSUInteger)width
+                                              height:(NSUInteger)height
+                                         suffixBytes:(NSArray<NSNumber *> *)suffixBytes
+{
+  NSArray<NSNumber *> *nearNativeScales = @[
+    @0.99,
+    @0.98,
+    @0.97,
+  ];
+
+  for (NSNumber *scaleValue in nearNativeScales) {
+    double scale = scaleValue.doubleValue;
+    NSUInteger logicalWidth = (NSUInteger)llround((double)width * scale);
+    NSUInteger logicalHeight = (NSUInteger)llround((double)height * scale);
 
     if (logicalWidth == 0 || logicalHeight == 0) {
       continue;
@@ -1712,6 +1734,34 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     double ratio = ratioValue.doubleValue;
     NSUInteger logicalWidth = (NSUInteger)llround((double)width / ratio);
     NSUInteger logicalHeight = (NSUInteger)llround((double)height / ratio);
+
+    if (logicalWidth == 0 || logicalHeight == 0) {
+      continue;
+    }
+
+    [resolutionKeys addObject:[self resolutionKeyForWidth:logicalWidth height:logicalHeight]];
+  }
+
+  for (NSString *nearNativeKey in [self generatedHiDpiNearNativeResolutionKeysForWidth:width height:height]) {
+    [resolutionKeys addObject:nearNativeKey];
+  }
+
+  return resolutionKeys;
+}
+
+- (NSSet<NSString *> *)generatedHiDpiNearNativeResolutionKeysForWidth:(NSUInteger)width height:(NSUInteger)height
+{
+  NSMutableSet<NSString *> *resolutionKeys = [NSMutableSet new];
+  NSArray<NSNumber *> *nearNativeScales = @[
+    @0.99,
+    @0.98,
+    @0.97,
+  ];
+
+  for (NSNumber *scaleValue in nearNativeScales) {
+    double scale = scaleValue.doubleValue;
+    NSUInteger logicalWidth = (NSUInteger)llround((double)width * scale);
+    NSUInteger logicalHeight = (NSUInteger)llround((double)height * scale);
 
     if (logicalWidth == 0 || logicalHeight == 0) {
       continue;
@@ -1812,6 +1862,16 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   return YES;
 }
 
+- (BOOL)isSub4KHiDpiUnlockTargetWithWidth:(NSUInteger)width height:(NSUInteger)height
+{
+  return width < RCTDisplay4KWidth || height < RCTDisplay4KHeight;
+}
+
+- (NSString *)hiDpiUnlockTargetClassWithWidth:(NSUInteger)width height:(NSUInteger)height
+{
+  return [self isSub4KHiDpiUnlockTargetWithWidth:width height:height] ? @"sub4k" : @"4k-or-above";
+}
+
 - (NSData *)scaleResolutionDataWithWidth:(NSUInteger)width height:(NSUInteger)height
 {
   uint32_t encodedResolution[2] = {
@@ -1908,76 +1968,87 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   }
 
   NSUInteger generatedHiDpiRowsAdded = 0;
-  NSUInteger generatedHiDpiRowsSkippedExact = 0;
-  NSUInteger generatedHiDpiRowsSkippedRecipe = 0;
   NSUInteger generatedHiDpiRowsSkippedDuplicate = 0;
-  NSUInteger generatedHiDpiRowsSkippedNonSeed = 0;
-  NSUInteger seedArea = 0;
+  NSUInteger generatedHiDpiRowsSkipped4KOrAbove = 0;
+  NSDictionary *targetMode = nil;
+  NSUInteger targetArea = 0;
 
   for (NSDictionary *mode in bestStandardModeByResolution.allValues) {
     NSUInteger width = [mode[@"width"] unsignedIntegerValue];
     NSUInteger height = [mode[@"height"] unsignedIntegerValue];
-    seedArea = MAX(seedArea, width * height);
+    double refreshRate = [mode[@"refreshRate"] doubleValue];
+    NSUInteger area = width * height;
+
+    if (targetMode == nil ||
+        area > targetArea ||
+        (area == targetArea && refreshRate > [targetMode[@"refreshRate"] doubleValue])) {
+      targetMode = mode;
+      targetArea = area;
+    }
   }
 
-  for (NSString *resolutionKey in bestStandardModeByResolution) {
-    NSDictionary *mode = bestStandardModeByResolution[resolutionKey];
-    NSUInteger width = [mode[@"width"] unsignedIntegerValue];
-    NSUInteger height = [mode[@"height"] unsignedIntegerValue];
-    double refreshRate = [mode[@"refreshRate"] doubleValue];
-    NSString *modeID = [self generatedHiDpiModeIDWithWidth:width height:height refreshRate:refreshRate];
-    BOOL recipeIsExposed = [self generatedHiDpiRecipeIsExposedInResolutionKeys:seenHiDpiResolutionKeys
-                                                                         width:width
-                                                                        height:height];
-    BOOL installedOneKeyRecipe = [self installedOneKeyHiDpiRecipeExistsForDisplayID:displayID
-                                                                              width:width
-                                                                             height:height];
+  NSUInteger targetWidth = [targetMode[@"width"] unsignedIntegerValue];
+  NSUInteger targetHeight = [targetMode[@"height"] unsignedIntegerValue];
+  double targetRefreshRate = [targetMode[@"refreshRate"] doubleValue];
+  NSString *targetResolution = targetMode != nil
+      ? [NSString stringWithFormat:@"%lux%lu", (unsigned long)targetWidth, (unsigned long)targetHeight]
+      : @"none";
+  NSString *targetClass = targetMode != nil
+      ? [self hiDpiUnlockTargetClassWithWidth:targetWidth height:targetHeight]
+      : @"none";
+  BOOL targetIsSub4K = targetMode != nil && [self isSub4KHiDpiUnlockTargetWithWidth:targetWidth
+                                                                             height:targetHeight];
+  BOOL exactHiDpiExists = targetMode != nil &&
+      [seenHiDpiResolutionKeys containsObject:[self resolutionKeyForWidth:targetWidth height:targetHeight]];
+  BOOL recipeIsExposed = targetMode != nil &&
+      [self generatedHiDpiRecipeIsExposedInResolutionKeys:seenHiDpiResolutionKeys
+                                                    width:targetWidth
+                                                   height:targetHeight];
+  BOOL installedOneKeyRecipe = targetIsSub4K &&
+      [self installedOneKeyHiDpiRecipeExistsForDisplayID:displayID
+                                                   width:targetWidth
+                                                  height:targetHeight];
 
-    if (width * height < seedArea) {
-      generatedHiDpiRowsSkippedNonSeed++;
-      continue;
-    }
+  if (targetMode != nil && !targetIsSub4K) {
+    generatedHiDpiRowsSkipped4KOrAbove++;
+  }
 
-    if ([seenHiDpiRefreshKeys containsObject:[self resolutionRefreshKeyForWidth:width
-                                                                         height:height
-                                                                    refreshRate:refreshRate]]) {
-      generatedHiDpiRowsSkippedExact++;
-      continue;
-    }
-
-    if (recipeIsExposed && installedOneKeyRecipe) {
-      generatedHiDpiRowsSkippedRecipe++;
-      continue;
-    }
-
+  if (targetMode != nil &&
+      targetIsSub4K &&
+      !exactHiDpiExists &&
+      !(recipeIsExposed && installedOneKeyRecipe)) {
+    NSString *modeID = [self generatedHiDpiModeIDWithWidth:targetWidth
+                                                    height:targetHeight
+                                               refreshRate:targetRefreshRate];
     if ([seenModeIDs containsObject:modeID]) {
       generatedHiDpiRowsSkippedDuplicate++;
-      continue;
+    } else {
+      [seenModeIDs addObject:modeID];
+      [modeDictionaries addObject:@{
+        @"id" : modeID,
+        @"width" : @(targetWidth),
+        @"height" : @(targetHeight),
+        @"refreshRate" : @(targetRefreshRate),
+        @"isHiDpi" : @YES,
+        @"isCurrent" : @NO,
+        @"isFavorite" : @([self modeIDIsFavorite:modeID displayIDString:displayIDString]),
+        @"requiresOverride" : @YES,
+      }];
+      generatedHiDpiRowsAdded++;
     }
-
-    [seenModeIDs addObject:modeID];
-    [modeDictionaries addObject:@{
-      @"id" : modeID,
-      @"width" : @(width),
-      @"height" : @(height),
-      @"refreshRate" : @(refreshRate),
-      @"isHiDpi" : @YES,
-      @"isCurrent" : @NO,
-      @"isFavorite" : @([self modeIDIsFavorite:modeID displayIDString:displayIDString]),
-      @"requiresOverride" : @YES,
-    }];
-    generatedHiDpiRowsAdded++;
   }
 
-  NSLog(@"[macDisplayBar] Generated HiDPI install row summary: displayID=%@ standardResolutionCount=%lu hiDpiResolutionCount=%lu seedArea=%lu added=%lu skippedExact=%lu skippedRecipe=%lu skippedNonSeed=%lu skippedDuplicate=%lu totalModeCount=%lu",
+  NSLog(@"[macDisplayBar] Generated HiDPI install row summary: displayID=%@ targetResolution=%@ targetClass=%@ standardResolutionCount=%lu hiDpiResolutionCount=%lu added=%lu skipped4kOrAbove=%lu exactHiDpiExists=%@ recipeInstalled=%@ recipeExposed=%@ skippedDuplicate=%lu totalModeCount=%lu",
         displayIDString,
+        targetResolution,
+        targetClass,
         (unsigned long)bestStandardModeByResolution.count,
         (unsigned long)seenHiDpiResolutionKeys.count,
-        (unsigned long)seedArea,
         (unsigned long)generatedHiDpiRowsAdded,
-        (unsigned long)generatedHiDpiRowsSkippedExact,
-        (unsigned long)generatedHiDpiRowsSkippedRecipe,
-        (unsigned long)generatedHiDpiRowsSkippedNonSeed,
+        (unsigned long)generatedHiDpiRowsSkipped4KOrAbove,
+        exactHiDpiExists ? @"YES" : @"NO",
+        installedOneKeyRecipe ? @"YES" : @"NO",
+        recipeIsExposed ? @"YES" : @"NO",
         (unsigned long)generatedHiDpiRowsSkippedDuplicate,
         (unsigned long)modeDictionaries.count);
 
@@ -2307,12 +2378,23 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   NSUInteger sameSizeSameRefreshCount = 0;
   NSUInteger sameSizeHiDpiCount = 0;
   NSMutableArray<NSString *> *sameSizeModeDescriptions = [NSMutableArray new];
+  NSMutableArray<NSString *> *nearNativeHiDpiDescriptions = [NSMutableArray new];
 
   for (id item in modes) {
     CGDisplayModeRef candidate = (__bridge CGDisplayModeRef)item;
     BOOL sameSize = CGDisplayModeGetWidth(candidate) == width && CGDisplayModeGetHeight(candidate) == height;
     BOOL sameRefresh = refreshRate <= 0 || fabs(CGDisplayModeGetRefreshRate(candidate) - refreshRate) < 0.5;
     BOOL isHiDpi = CGDisplayModeGetPixelWidth(candidate) > CGDisplayModeGetWidth(candidate);
+    double targetAspectRatio = height > 0 ? (double)width / (double)height : 0;
+    double candidateAspectRatio = CGDisplayModeGetHeight(candidate) > 0
+        ? (double)CGDisplayModeGetWidth(candidate) / (double)CGDisplayModeGetHeight(candidate)
+        : 0;
+    BOOL nearNativeHiDpi =
+        isHiDpi &&
+        !sameSize &&
+        CGDisplayModeGetWidth(candidate) < width &&
+        CGDisplayModeGetWidth(candidate) >= (size_t)llround((double)width * 0.97) &&
+        fabs(candidateAspectRatio - targetAspectRatio) < 0.02;
 
     if (sameSize) {
       sameSizeCount++;
@@ -2336,6 +2418,15 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
       }
     }
 
+    if (nearNativeHiDpi && nearNativeHiDpiDescriptions.count < 8) {
+      [nearNativeHiDpiDescriptions addObject:[NSString stringWithFormat:@"%zux%zu->%zux%zu@%.3f HiDPI",
+                                             CGDisplayModeGetWidth(candidate),
+                                             CGDisplayModeGetHeight(candidate),
+                                             CGDisplayModeGetPixelWidth(candidate),
+                                             CGDisplayModeGetPixelHeight(candidate),
+                                             CGDisplayModeGetRefreshRate(candidate)]];
+    }
+
     if (!sameSize || !sameRefresh) {
       continue;
     }
@@ -2347,7 +2438,7 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   }
 
   if (hiDpiMode == NULL) {
-    NSLog(@"[macDisplayBar] Generated HiDPI exact mode not found: displayID=%u width=%lu height=%lu refreshRate=%.3f modeCount=%lu sameSize=%lu sameSizeSameRefresh=%lu sameSizeHiDPI=%lu sameSizeModes=%@",
+    NSLog(@"[macDisplayBar] Generated HiDPI exact mode not found: displayID=%u width=%lu height=%lu refreshRate=%.3f modeCount=%lu sameSize=%lu sameSizeSameRefresh=%lu sameSizeHiDPI=%lu sameSizeModes=%@ nearNativeHiDPI=%@",
           displayID,
           (unsigned long)width,
           (unsigned long)height,
@@ -2356,7 +2447,8 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
           (unsigned long)sameSizeCount,
           (unsigned long)sameSizeSameRefreshCount,
           (unsigned long)sameSizeHiDpiCount,
-          [sameSizeModeDescriptions componentsJoinedByString:@" | "]);
+          [sameSizeModeDescriptions componentsJoinedByString:@" | "],
+          [nearNativeHiDpiDescriptions componentsJoinedByString:@" | "]);
     if (error != NULL) {
       *error = kCGErrorIllegalArgument;
     }

@@ -91,6 +91,7 @@ const nativeSnapshot = vi.hoisted(() => ({
           isHiDpi: true,
           isCurrent: false,
           isFavorite: false,
+          requiresOverride: true,
         },
         {
           id: 'generated-hidpi:3440:1440:60.000',
@@ -525,6 +526,12 @@ test('generated HiDPI mode installs without opening a guidance or revert flow', 
   const modeRow = renderer!.root
     .findAllByProps({ accessibilityRole: 'button' })
     .find((node) => normalizedText(node).includes('3440 x 1440'));
+
+  expect(
+    renderer!.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .some((node) => normalizedText(node).includes('Install')),
+  ).toBe(true);
 
   await ReactTestRenderer.act(async () => {
     modeRow!.props.onPress();

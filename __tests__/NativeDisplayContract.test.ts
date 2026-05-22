@@ -357,7 +357,23 @@ test('generated HiDPI selections install overrides and do not fall back to stand
   expect(displayCore).not.toContain('DisplayProductID-%x.plist');
   expect(displayCore).not.toContain('@"IODisplayEDID"');
   expect(displayCore).not.toContain('@"CustomResolutions" : customResolutions');
-  expect(displayCore).toContain('generatedHiDpiRowsSkippedNonSeed');
+  expect(displayCore).toContain('RCTDisplay4KWidth = 3840');
+  expect(displayCore).toContain('RCTDisplay4KHeight = 2160');
+  expect(displayCore).toContain('isSub4KHiDpiUnlockTargetWithWidth');
+  expect(displayCore).toContain('targetClass=%@');
+  expect(displayCore).toContain('@"sub4k"');
+  expect(displayCore).toContain('skipped4kOrAbove');
+  expect(displayCore).toContain('!targetIsSub4K');
+  expect(displayCore).toContain('exactHiDpiExists');
+  expect(displayCore).toContain('recipeInstalled');
+  expect(displayCore).toContain(
+    'generatedHiDpiNearNativeResolutionKeysForWidth',
+  );
+  expect(displayCore).toContain('appendNearNativeHiDpiScaleResolutionsToArray');
+  expect(displayCore).toContain('@0.99');
+  expect(displayCore).toContain('@0.98');
+  expect(displayCore).toContain('@0.97');
+  expect(displayCore).not.toContain('CGVirtualDisplay');
   expect(displayCore).toContain('appendOneKeyHiDpiScaleResolutionsToArray');
   expect(displayCore).toContain(
     'oneKeyHiDpiScaleResolutionDataWithLogicalWidth',
