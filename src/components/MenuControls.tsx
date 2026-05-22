@@ -360,6 +360,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginRight: 8,
     minHeight: 40,
+    minWidth: 0,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -391,6 +392,7 @@ const styles = StyleSheet.create({
   },
   textBlock: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 8,
   },
   name: {

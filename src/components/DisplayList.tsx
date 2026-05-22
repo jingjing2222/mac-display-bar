@@ -349,6 +349,8 @@ function AdvancedControls({
           onPress={() => setCustomIsHiDpi((isHiDpi) => !isHiDpi)}
           selected={customIsHiDpi}
         />
+      </View>
+      <View style={styles.syncActions}>
         <ControlButton label="Sleep" onPress={onSoftDisconnect} />
         <ControlButton label="Wake" onPress={onReconnect} />
       </View>
@@ -1058,6 +1060,7 @@ const styles = StyleSheet.create({
   },
   displayNameBlock: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 12,
   },
   displayName: {
@@ -1096,6 +1099,7 @@ const styles = StyleSheet.create({
   metric: {
     flex: 1,
     marginRight: 8,
+    minWidth: 0,
   },
   metricLabel: {
     color: '#656a76',
@@ -1284,6 +1288,7 @@ const styles = StyleSheet.create({
   },
   presetTextBlock: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 8,
   },
   presetName: {

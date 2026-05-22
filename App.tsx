@@ -6,14 +6,7 @@
  */
 
 import { HotUpdater } from '@hot-updater/react-native';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DisplayList } from './src/components/DisplayList';
 import { HotUpdateControls } from './src/components/HotUpdateControls';
 import {
@@ -28,9 +21,11 @@ const font = {
   family: 'Inter',
 } as const;
 
+const menuMetrics = {
+  width: 460,
+} as const;
+
 function App() {
-  const { width } = useWindowDimensions();
-  const panelWidth = Math.min(Math.max(width, 360), 420);
   const {
     actions,
     presetName,
@@ -46,11 +41,11 @@ function App() {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.panelContent}
-        style={[styles.panel, { width: panelWidth }]}
+        style={styles.panel}
       >
         <View>
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerTitleBlock}>
               <Text style={styles.eyebrow}>DISPLAY CONTROL</Text>
               <Text style={styles.title}>Mac Display Bar</Text>
             </View>
@@ -60,7 +55,7 @@ function App() {
           </View>
 
           <View style={styles.summary}>
-            <View>
+            <View style={styles.summaryTextBlock}>
               <Text style={styles.summaryValue}>
                 {snapshot.displays.length}
               </Text>
@@ -144,6 +139,7 @@ const styles = StyleSheet.create({
   panel: {
     flex: 1,
     backgroundColor: '#000000',
+    width: menuMetrics.width,
   },
   panelContent: {
     padding: 16,
@@ -155,6 +151,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingBottom: 16,
+  },
+  headerTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
   },
   eyebrow: {
     color: '#656a76',
@@ -197,6 +198,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 16,
+  },
+  summaryTextBlock: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
   },
   summaryValue: {
     color: '#ffffff',

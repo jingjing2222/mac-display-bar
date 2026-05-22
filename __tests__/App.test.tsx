@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { ScrollView } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { vi } from 'vitest';
 
@@ -227,6 +228,22 @@ test('renders correctly', async () => {
   await ReactTestRenderer.act(() => {
     ReactTestRenderer.create(<App />);
   });
+});
+
+test('uses the fixed menu bar popover width', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const scrollView = renderer!.root.findByType(ScrollView);
+
+  expect(scrollView.props.style).toEqual(
+    expect.objectContaining({
+      width: 460,
+    }),
+  );
 });
 
 test('renders BetterDisplay phase-three controls from native snapshot', async () => {
