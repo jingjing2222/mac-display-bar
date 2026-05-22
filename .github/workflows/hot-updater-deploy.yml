@@ -1,0 +1,65 @@
+name: Hot Updater Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - App.tsx
+      - index.js
+      - app.json
+      - babel.config.js
+      - metro.config.js
+      - hot-updater.config.ts
+      - package.json
+      - yarn.lock
+      - src/**
+      - specs/**
+
+concurrency:
+  group: hot-updater-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Disabled macOS Bundle
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install JavaScript dependencies
+        run: yarn install --immutable
+
+      - name: Write hot-updater env
+        run: |
+          {
+            echo "HOT_UPDATER_BASE_URL=${{ secrets.HOT_UPDATER_BASE_URL }}"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME=${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME }}"
+            echo "HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID=${{ secrets.HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID }}"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID=${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID }}"
+            echo "HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY=${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY }}"
+            echo "HOT_UPDATER_CLOUDFLARE_D1_DATABASE_ID=${{ secrets.HOT_UPDATER_CLOUDFLARE_D1_DATABASE_ID }}"
+            echo "HOT_UPDATER_CLOUDFLARE_API_TOKEN=${{ secrets.HOT_UPDATER_CLOUDFLARE_API_TOKEN }}"
+          } > .env.hotupdater
+
+      - name: Deploy disabled bundle
+        run: >
+          yarn hot-updater deploy
+          --platform macos
+          --channel production
+          --disabled
