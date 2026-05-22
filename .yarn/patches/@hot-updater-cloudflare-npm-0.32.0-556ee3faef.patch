@@ -1,0 +1,44 @@
+diff --git a/worker/dist/index.js b/worker/dist/index.js
+index e7e69663d1a351f71bb272723e6330df4982a883..cca4ce715a2282242d76c5f3237e3782691efae5 100644
+--- a/worker/dist/index.js
++++ b/worker/dist/index.js
+@@ -9196,7 +9196,7 @@ var decodeMaybe = /* @__PURE__ */ __name((value) => {
+   }
+ }, "decodeMaybe");
+ var isPlatform = /* @__PURE__ */ __name((value) => {
+-  return value === "ios" || value === "android";
++  return value === "ios" || value === "android" || value === "macos";
+ }, "isPlatform");
+ var requireRouteParam = /* @__PURE__ */ __name((params, key) => {
+   const value = params[key];
+@@ -9248,7 +9248,7 @@ var requirePlatformParam = /* @__PURE__ */ __name((params) => {
+   const platform2 = requireRouteParam(params, "platform");
+   if (!isPlatform(platform2)) {
+     throw new HandlerBadRequestError(
+-      `Invalid platform: ${platform2}. Expected 'ios' or 'android'.`
++      `Invalid platform: ${platform2}. Expected 'ios', 'android', or 'macos'.`
+     );
+   }
+   return platform2;
+@@ -9374,7 +9374,7 @@ var handleGetBundles = /* @__PURE__ */ __name(async (_params, request, api, cont
+   }
+   if (platform2 !== null && !isPlatform(platform2)) {
+     throw new HandlerBadRequestError(
+-      `Invalid platform: ${platform2}. Expected 'ios' or 'android'.`
++      `Invalid platform: ${platform2}. Expected 'ios', 'android', or 'macos'.`
+     );
+   }
+   const result = await api.getBundles(
+diff --git a/worker/migrations/0001_hot-updater_init.sql b/worker/migrations/0001_hot-updater_init.sql
+index d4e2e340245fad90ac22e2c7bb19b7259e08a48d..a3177c0dea74a09ff5173dbb9fbaa8ec7c6aaf03 100644
+--- a/worker/migrations/0001_hot-updater_init.sql
++++ b/worker/migrations/0001_hot-updater_init.sql
+@@ -3,7 +3,7 @@
+ 
+ CREATE TABLE bundles (
+     id TEXT PRIMARY KEY,
+-    platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
++    platform TEXT NOT NULL CHECK (platform IN ('ios', 'android', 'macos')),
+     target_app_version TEXT NOT NULL,
+     should_force_update INTEGER NOT NULL CHECK (should_force_update IN (0, 1)),
+     enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),

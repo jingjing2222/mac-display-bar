@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 
+#import <HotUpdater/HotUpdater.h>
 #import <React/RCTBundleURLProvider.h>
 #import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
 
@@ -26,7 +27,7 @@
 #if DEBUG
   return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
 #else
-  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  return [HotUpdater bundleURLWithBundle:[NSBundle mainBundle]];
 #endif
 }
 

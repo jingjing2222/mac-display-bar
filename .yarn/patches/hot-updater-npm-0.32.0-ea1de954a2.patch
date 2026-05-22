@@ -1,0 +1,94 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87e2f11519 100755
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -3843,7 +3843,7 @@ var require_valid$1 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+ //#region src/commandOptions/index.ts
+ var import_valid = /* @__PURE__ */ __toESM(require_valid$1(), 1);
+ const PLATFORMS = ["ios", "android"];
+-const platformCommandOption = new Option("-p, --platform <platform>", "specify the platform").choices(["ios", "android"]);
++const platformCommandOption = new Option("-p, --platform <platform>", "specify the platform").choices(["ios", "android", "macos"]);
+ const interactiveCommandOption = new Option("-i, --interactive", "interactive mode").default(false);
+ const nativeBuildSchemeCommandOption = new Option("-s, --scheme <scheme>", "predefined scheme for the native build configuration");
+ const nativeBuildOutputCommandOption = new Option("-o, --output-path <outputPath>", "the path where the artifacts will be generated");
+@@ -22883,6 +22883,7 @@ const getIOSVersion = async ({ parser, validateWithSemver = false }) => {
+ const getNativeAppVersion = async (platform) => {
+ 	switch (platform) {
+ 		case "ios": return getIOSVersion({ parser: ["xcodeproj", "info-plist"] });
++		case "macos": return getIOSVersion({ parser: ["xcodeproj", "info-plist"] });
+ 		case "android": return getAndroidVersion({ parser: "app-build-gradle" });
+ 		default: return null;
+ 	}
+@@ -29735,6 +29736,9 @@ const getPlatform = async (message) => {
+ 		}, {
+ 			label: "android",
+ 			value: "android"
++		}, {
++			label: "macos",
++			value: "macos"
+ 		}]
+ 	});
+ };
+@@ -30035,6 +30039,9 @@ const getDefaultTargetAppVersion = async (platform) => {
+ 		case "ios":
+ 			version = await getIOSVersion({ parser: "info-plist" });
+ 			break;
++		case "macos":
++			version = await getIOSVersion({ parser: "info-plist" });
++			break;
+ 		case "android":
+ 			version = await getAndroidVersion({ parser: "app-build-gradle" });
+ 			break;
+@@ -30215,14 +30222,14 @@ const getUniqueContentAddressedAssetUploadTargets = ({ manifest, targetFiles })
+ 	}
+ 	return [...targets.values()];
+ };
+-const getPlatformName = (platform) => platform === "ios" ? "iOS" : "Android";
++const getPlatformName = (platform) => platform === "ios" ? "iOS" : platform === "macos" ? "macOS" : "Android";
+ const getDeployPlatforms = async (options) => {
+ 	if (options.platform) return [options.platform];
+ 	if (!options.interactive) return [...PLATFORMS];
+ 	const platform = await getPlatform("Which platform do you want to deploy?");
+ 	if (p.isCancel(platform)) return null;
+ 	if (!platform) {
+-		p.log.error("Platform not found. -p <ios | android> or --platform <ios | android>");
++		p.log.error("Platform not found. -p <ios | android | macos> or --platform <ios | android | macos>");
+ 		return null;
+ 	}
+ 	return [platform];
+@@ -30310,7 +30317,7 @@ const deployPlatform = async ({ options, platform, platformIndex, platformCount
+ 				showFingerprintDiff(await getFingerprintDiff(projectFingerprint[platform], {
+ 					platform,
+ 					...config.fingerprint
+-				}), platform === "ios" ? "iOS" : "Android");
++				}), getPlatformName(platform));
+ 			} catch {
+ 				p.log.warn("Could not generate fingerprint diff");
+ 			}
+@@ -30330,7 +30337,7 @@ const deployPlatform = async ({ options, platform, platformIndex, platformCount
+ 		}) : defaultTargetAppVersion);
+ 		if (p.isCancel(targetAppVersion)) return null;
+ 		if (!targetAppVersion) {
+-			p.log.error("Target app version not found in native files (Info.plist for iOS, build.gradle for Android). Pass -t <targetAppVersion> explicitly, or check your native config.");
++			p.log.error("Target app version not found in native files (Info.plist for iOS/macOS, build.gradle for Android). Pass -t <targetAppVersion> explicitly, or check your native config.");
+ 			return null;
+ 		}
+ 		target.appVersion = targetAppVersion;
+@@ -30769,7 +30776,7 @@ const createPatch = async (options) => {
+ 	const platform = options.platform ?? (options.interactive ? await getPlatform("Which platform does this patch target?") : null);
+ 	if (p.isCancel(platform)) return;
+ 	if (!platform) {
+-		p.log.error("Platform not found. -p <ios | android> or --platform <ios | android>");
++		p.log.error("Platform not found. -p <ios | android | macos> or --platform <ios | android | macos>");
+ 		return;
+ 	}
+ 	const config = await loadConfig({
+@@ -30780,7 +30787,7 @@ const createPatch = async (options) => {
+ 	try {
+ 		p.note([
+ 			`Channel: ${options.channel}`,
+-			`Platform: ${platform === "ios" ? "iOS" : "Android"}`,
++			`Platform: ${getPlatformName(platform)}`,
+ 			`Base bundle: ${options.baseBundleId}`,
+ 			`Target bundle: ${options.bundleId}`
+ 		].join("\n"), "Patch");

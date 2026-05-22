@@ -13,6 +13,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
+    "@hot-updater/react-native": "patch:@hot-updater/react-native@npm%3A0.32.0#~/.yarn/patches/@hot-updater-react-native-npm-0.32.0-8cbcc9f116.patch",
     "react": "19.1.4",
     "react-native": "0.81.6",
     "react-native-macos": "^0.81.0-0"
@@ -22,17 +23,22 @@
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@granite-js/vitest": "^1.0.28",
+    "@hot-updater/bare": "0.32.0",
+    "@hot-updater/cloudflare": "patch:@hot-updater/cloudflare@npm%3A0.32.0#~/.yarn/patches/@hot-updater-cloudflare-npm-0.32.0-556ee3faef.patch",
     "@react-native-community/cli": "20.0.0",
     "@react-native/babel-preset": "0.81.6",
     "@react-native/metro-config": "0.81.6",
     "@react-native/typescript-config": "0.81.6",
     "@types/react": "^19.1.4",
     "@types/react-test-renderer": "^19.1.0",
+    "dotenv": "^17.4.2",
+    "hot-updater": "patch:hot-updater@npm%3A0.32.0#~/.yarn/patches/hot-updater-npm-0.32.0-ea1de954a2.patch",
     "oxfmt": "^0.51.0",
     "oxlint": "^1.66.0",
     "react-test-renderer": "19.1.0",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "wrangler": "^4.93.1"
   },
   "engines": {
     "node": ">=20"

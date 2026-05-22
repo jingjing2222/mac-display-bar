@@ -8,6 +8,34 @@ PODS:
   - hermes-engine (0.81.6):
     - hermes-engine/Pre-built (= 0.81.6)
   - hermes-engine/Pre-built (0.81.6)
+  - HotUpdater (0.32.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -1749,93 +1777,6 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - SocketRocket
-  - react-native-safe-area-context (5.8.0):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - react-native-safe-area-context/common (= 5.8.0)
-    - react-native-safe-area-context/fabric (= 5.8.0)
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - SocketRocket
-    - Yoga
-  - react-native-safe-area-context/common (5.8.0):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - SocketRocket
-    - Yoga
-  - react-native-safe-area-context/fabric (5.8.0):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - react-native-safe-area-context/common
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - SocketRocket
-    - Yoga
   - React-NativeModulesApple (0.81.7):
     - boost
     - DoubleConversion
@@ -2352,6 +2293,7 @@ DEPENDENCIES:
   - fmt (from `../node_modules/react-native-macos/third-party-podspecs/fmt.podspec`)
   - glog (from `../node_modules/react-native-macos/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native-macos/sdks/hermes-engine/hermes-engine.podspec`)
+  - "HotUpdater (from `../node_modules/@hot-updater/react-native`)"
   - RCT-Folly (from `../node_modules/react-native-macos/third-party-podspecs/RCT-Folly.podspec`)
   - RCTDeprecation (from `../node_modules/react-native-macos/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../node_modules/react-native-macos/Libraries/Required`)
@@ -2386,7 +2328,6 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native-macos/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native-macos/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native-macos/ReactCommon/react/nativemodule/microtasks`)
-  - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native-macos/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native-macos/ReactCommon/oscompat`)
   - React-perflogger (from `../node_modules/react-native-macos/ReactCommon/reactperflogger`)
@@ -2440,6 +2381,8 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../node_modules/react-native-macos/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-07-07-RNv0.81.0-e0fc67142ec0763c6b6153ca2bf96df815539782
+  HotUpdater:
+    :path: "../node_modules/@hot-updater/react-native"
   RCT-Folly:
     :podspec: "../node_modules/react-native-macos/third-party-podspecs/RCT-Folly.podspec"
   RCTDeprecation:
@@ -2506,8 +2449,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-macos/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native-macos/ReactCommon/react/nativemodule/microtasks"
-  react-native-safe-area-context:
-    :path: "../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
     :path: "../node_modules/react-native-macos/ReactCommon/react/nativemodule/core/platform/ios"
   React-oscompat:
@@ -2579,6 +2520,7 @@ SPEC CHECKSUMS:
   fmt: 24e7591456deb60b4a77518f83d9a916ac84223f
   glog: 0b31c25149b9d350b2666c7d459229861a00ec07
   hermes-engine: 7219f6e751ad6ec7f3d7ec121830ee34dae40749
+  HotUpdater: 1ef983fdc81586b5218576013fa3ed63d39c466f
   RCT-Folly: c803cf33238782d5fd21a5e02d44f64068e0e130
   RCTDeprecation: 32fb5034012098ad1f67eba8a62d73bdd7d082e7
   RCTRequired: 9f51919b547926d0c148032cf2a7271a37655af4
@@ -2612,7 +2554,6 @@ SPEC CHECKSUMS:
   React-logger: 079107325dda1ad527b324f4f3cf61e4f6ce4600
   React-Mapbuffer: 59df6730a578de280cd8675cdf5440b91c243bdf
   React-microtasksnativemodule: 255f0b29a74d001ecd202e4d5f7f170a009b3987
-  react-native-safe-area-context: ebd2c2ece5e6e650a6963184039ec8cfd8960d86
   React-NativeModulesApple: c1e8f5e34efed354e5a066ef47c45a4ca5dddbb4
   React-oscompat: b359d251f6ea20fa91e5e0f99fd7b563f50a8af3
   React-perflogger: e5156a6e931998e62a95a5e1a4428e3a17a0e5cf

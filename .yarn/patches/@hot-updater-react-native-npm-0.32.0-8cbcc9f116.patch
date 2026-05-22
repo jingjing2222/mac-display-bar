@@ -1,0 +1,161 @@
+diff --git a/HotUpdater.podspec b/HotUpdater.podspec
+index 828c5fcc77c7a6cf4e94430557ea1f661b06d59f..fae571695844fa2f354c7db6e78c1bb63b4517bb 100644
+--- a/HotUpdater.podspec
++++ b/HotUpdater.podspec
+@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
+   s.license      = package["license"]
+   s.authors      = package["author"]
+ 
+-  s.platforms    = { :ios => "13.4", :tvos => "13.4" }
++  s.platforms    = { :ios => "13.4", :tvos => "13.4", :osx => "13.4" }
+   s.source       = { :git => "https://github.com/gronxb/hot-updater.git", :tag => "#{s.version}" }
+   s.source_files  = "ios/**/*.{h,m,mm,swift}"
+   s.public_header_files = "ios/HotUpdater/Public/*.h"
+diff --git a/ios/HotUpdater/Internal/BundleFileStorageService.swift b/ios/HotUpdater/Internal/BundleFileStorageService.swift
+index 7b14a372a772d9780dfa7a16ed893d842aef200f..1235463d5bb7704c910338e27a0251f97ee6ee0c 100644
+--- a/ios/HotUpdater/Internal/BundleFileStorageService.swift
++++ b/ios/HotUpdater/Internal/BundleFileStorageService.swift
+@@ -227,7 +227,7 @@ public enum BundleStorageError: Error, CustomNSError {
+             userInfo[NSLocalizedRecoverySuggestionErrorKey] = "The downloaded file is not a supported bundle archive. Try downloading again"
+ 
+         case .invalidBundle:
+-            userInfo[NSLocalizedDescriptionKey] = "Bundle missing required platform files (index.ios.bundle or main.jsbundle)"
++            userInfo[NSLocalizedDescriptionKey] = "Bundle missing required platform files (index.macos.bundle, index.ios.bundle, or main.jsbundle)"
+             userInfo[NSLocalizedRecoverySuggestionErrorKey] = "Verify the bundle was built correctly with metro bundler"
+ 
+         case .insufficientDiskSpace:
+@@ -1281,6 +1281,12 @@ class BundleFileStorageService: BundleStorageService {
+     func findBundleFile(in directoryPath: String) -> Result<String?, Error> {
+         NSLog("[BundleStorage] Searching for bundle file in directory: \(directoryPath)")
+ 
++        let macOSBundlePath = (directoryPath as NSString).appendingPathComponent("index.macos.bundle")
++        if self.fileSystem.fileExists(atPath: macOSBundlePath) {
++            NSLog("[BundleStorage] Found macOS bundle atPath: \(macOSBundlePath)")
++            return .success(macOSBundlePath)
++        }
++
+         let iosBundlePath = (directoryPath as NSString).appendingPathComponent("index.ios.bundle")
+         if self.fileSystem.fileExists(atPath: iosBundlePath) {
+             NSLog("[BundleStorage] Found iOS bundle atPath: \(iosBundlePath)")
+diff --git a/ios/HotUpdater/Internal/CohortService.swift b/ios/HotUpdater/Internal/CohortService.swift
+index 25cd418869ba996ac9c96cc1de398aac9c6bafae..0b60d26027712c5ef16d4e914d39455587d28fe8 100644
+--- a/ios/HotUpdater/Internal/CohortService.swift
++++ b/ios/HotUpdater/Internal/CohortService.swift
+@@ -1,5 +1,7 @@
+ import Foundation
++#if !os(macOS)
+ import UIKit
++#endif
+ 
+ final class CohortService {
+     private let userDefaults: UserDefaults
+@@ -51,11 +53,15 @@ final class CohortService {
+         }
+ 
+         let initialCohort: String
++        #if os(macOS)
++        initialCohort = defaultNumericCohort(for: fallbackIdentifier())
++        #else
+         if let idfv = UIDevice.current.identifierForVendor?.uuidString, !idfv.isEmpty {
+             initialCohort = defaultNumericCohort(for: idfv)
+         } else {
+             initialCohort = defaultNumericCohort(for: fallbackIdentifier())
+         }
++        #endif
+ 
+         userDefaults.set(initialCohort, forKey: cohortKey)
+         return initialCohort
+diff --git a/lib/commonjs/checkForUpdate.js b/lib/commonjs/checkForUpdate.js
+index 146e39b7bb1c2eaa00164be2b57e3e79a2eccdc0..b614944ccfe75f68b3b8ea28890eb09e94cbf452 100644
+--- a/lib/commonjs/checkForUpdate.js
++++ b/lib/commonjs/checkForUpdate.js
+@@ -18,8 +18,8 @@ async function checkForUpdate(options) {
+   if (__DEV__) {
+     return null;
+   }
+-  if (!["ios", "android"].includes(_reactNative.Platform.OS)) {
+-    options.onError?.(new _error.HotUpdaterError("HotUpdater is only supported on iOS and Android"));
++  if (!["ios", "android", "macos"].includes(_reactNative.Platform.OS)) {
++    options.onError?.(new _error.HotUpdaterError("HotUpdater is only supported on iOS, Android, and macOS"));
+     return null;
+   }
+   const currentAppVersion = (0, _native.getAppVersion)();
+diff --git a/lib/module/checkForUpdate.js b/lib/module/checkForUpdate.js
+index 0467375dbe6616a6f7f0cf7c8a6d434525c3db80..5888029143f32b51f7ddad683f1c5fdb583d7a78 100644
+--- a/lib/module/checkForUpdate.js
++++ b/lib/module/checkForUpdate.js
+@@ -14,8 +14,8 @@ export async function checkForUpdate(options) {
+   if (__DEV__) {
+     return null;
+   }
+-  if (!["ios", "android"].includes(Platform.OS)) {
+-    options.onError?.(new HotUpdaterError("HotUpdater is only supported on iOS and Android"));
++  if (!["ios", "android", "macos"].includes(Platform.OS)) {
++    options.onError?.(new HotUpdaterError("HotUpdater is only supported on iOS, Android, and macOS"));
+     return null;
+   }
+   const currentAppVersion = getAppVersion();
+diff --git a/lib/typescript/commonjs/types.d.ts b/lib/typescript/commonjs/types.d.ts
+index 04ae8a3d6e898aebbc747fa4d56c3be8a894a0e9..8425fbbd59f4a1893abc45de2631ae8b211edd24 100644
+--- a/lib/typescript/commonjs/types.d.ts
++++ b/lib/typescript/commonjs/types.d.ts
+@@ -8,7 +8,7 @@ export interface ResolverCheckUpdateParams {
+     /**
+      * The platform the app is running on
+      */
+-    platform: "ios" | "android";
++    platform: "ios" | "android" | "macos";
+     /**
+      * The current app version
+      */
+diff --git a/lib/typescript/module/types.d.ts b/lib/typescript/module/types.d.ts
+index 04ae8a3d6e898aebbc747fa4d56c3be8a894a0e9..8425fbbd59f4a1893abc45de2631ae8b211edd24 100644
+--- a/lib/typescript/module/types.d.ts
++++ b/lib/typescript/module/types.d.ts
+@@ -8,7 +8,7 @@ export interface ResolverCheckUpdateParams {
+     /**
+      * The platform the app is running on
+      */
+-    platform: "ios" | "android";
++    platform: "ios" | "android" | "macos";
+     /**
+      * The current app version
+      */
+diff --git a/src/checkForUpdate.ts b/src/checkForUpdate.ts
+index 285ce839bb8860205fd8a99c59c43fcb9c711414..091885812c4640c574fcdb3e8491c1b4d72f0d1b 100644
+--- a/src/checkForUpdate.ts
++++ b/src/checkForUpdate.ts
+@@ -70,15 +70,17 @@ export async function checkForUpdate(
+     return null;
+   }
+ 
+-  if (!["ios", "android"].includes(Platform.OS)) {
++  if (!["ios", "android", "macos"].includes(Platform.OS)) {
+     options.onError?.(
+-      new HotUpdaterError("HotUpdater is only supported on iOS and Android"),
++      new HotUpdaterError(
++        "HotUpdater is only supported on iOS, Android, and macOS",
++      ),
+     );
+     return null;
+   }
+ 
+   const currentAppVersion = getAppVersion();
+-  const platform = Platform.OS as "ios" | "android";
++  const platform = Platform.OS as "ios" | "android" | "macos";
+   const currentBundleId = getBundleId();
+   const minBundleId = getMinBundleId();
+   const defaultChannel = getDefaultChannel();
+diff --git a/src/types.ts b/src/types.ts
+index cb180ec439e95a87c61bfbad5e3cdd48a6101e33..448273347d1334f067270f092e8b3315a360f235 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -11,7 +11,7 @@ export interface ResolverCheckUpdateParams {
+   /**
+    * The platform the app is running on
+    */
+-  platform: "ios" | "android";
++  platform: "ios" | "android" | "macos";
+ 
+   /**
+    * The current app version
