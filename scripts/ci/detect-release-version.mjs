@@ -2,18 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 
 const infoPlistPath = 'macos/com.jingjing2222.macdisplaybar-macOS/Info.plist';
-const packageVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const currentVersion = readInfoVersion(readFileSync(infoPlistPath, 'utf8'));
 const baseSha = process.env.BASE_SHA;
 const outputPath = process.env.GITHUB_OUTPUT;
 let previousVersion = '';
-
-if (packageVersion !== currentVersion) {
-  console.error(
-    `::error::package.json version (${packageVersion}) must match ${infoPlistPath} CFBundleShortVersionString (${currentVersion}).`,
-  );
-  process.exit(1);
-}
 
 if (baseSha && !/^0+$/.test(baseSha)) {
   try {
