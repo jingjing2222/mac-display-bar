@@ -83,3 +83,6 @@ yarn-error.log
 .hot-updater/output
 .hot-updater/log
 /dist/
+
+# Local release runbook
+RELEASE.md
