@@ -5,45 +5,23 @@
  * @format
  */
 
-import {
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 import NativeFoo from './specs/NativeFoo';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  let nativeFooValue = 'NativeFoo unavailable';
+
+  try {
+    nativeFooValue = NativeFoo?.foo() ?? nativeFooValue;
+  } catch (error) {
+    nativeFooValue =
+      error instanceof Error ? error.message : 'NativeFoo threw unknown error';
+  }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const nativeFooValue = NativeFoo?.foo() ?? 'NativeFoo unavailable';
-
-  return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: safeAreaInsets.top,
-          paddingBottom: safeAreaInsets.bottom,
-        },
-      ]}
-    >
+    <View style={styles.container}>
       <View style={styles.nativeFooBanner}>
+        <Text style={styles.title}>mac-display-bar</Text>
         <Text style={styles.nativeFooLabel}>NativeFoo.foo()</Text>
         <Text style={styles.nativeFooValue}>{nativeFooValue}</Text>
       </View>
@@ -54,16 +32,31 @@ function AppContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f7f8fa',
+    padding: 24,
   },
   nativeFooBanner: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ffffff',
+    borderColor: '#d0d5dd',
+    borderRadius: 8,
+    borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  title: {
+    color: '#101828',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
   nativeFooLabel: {
+    color: '#344054',
     fontSize: 13,
     fontWeight: '600',
   },
   nativeFooValue: {
+    color: '#175cd3',
     fontSize: 24,
     fontWeight: '700',
   },
