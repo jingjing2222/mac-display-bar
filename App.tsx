@@ -5,12 +5,18 @@
  * @format
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import {
+  StatusBar,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import NativeFoo from './specs/NativeFoo';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -25,13 +31,22 @@ function App() {
 
 function AppContent() {
   const safeAreaInsets = useSafeAreaInsets();
+  const nativeFooValue = NativeFoo?.foo() ?? 'NativeFoo unavailable';
 
   return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: safeAreaInsets.top,
+          paddingBottom: safeAreaInsets.bottom,
+        },
+      ]}
+    >
+      <View style={styles.nativeFooBanner}>
+        <Text style={styles.nativeFooLabel}>NativeFoo.foo()</Text>
+        <Text style={styles.nativeFooValue}>{nativeFooValue}</Text>
+      </View>
     </View>
   );
 }
@@ -39,6 +54,18 @@ function AppContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  nativeFooBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  nativeFooLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  nativeFooValue: {
+    fontSize: 24,
+    fontWeight: '700',
   },
 });
 
