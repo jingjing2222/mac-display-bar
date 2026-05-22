@@ -14,6 +14,59 @@ permissions:
   contents: read
 
 jobs:
+  fingerprint-changes:
+    name: Fingerprint input changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check fingerprint inputs
+        id: diff
+        run: |
+          base_sha="${{ github.event.pull_request.base.sha || github.event.before }}"
+          head_sha="${{ github.sha }}"
+
+          if ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+            base_sha="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          fingerprint_inputs=(
+            "fingerprint.json"
+            "hot-updater.config.ts"
+            "package.json"
+            "yarn.lock"
+            ".yarn/patches/*"
+            "macos/com.jingjing2222.macdisplaybar-macOS/AppDelegate.h"
+            "macos/com.jingjing2222.macdisplaybar-macOS/AppDelegate.mm"
+            "macos/com.jingjing2222.macdisplaybar-macOS/Base.lproj/Main.storyboard"
+            "macos/com.jingjing2222.macdisplaybar-macOS/DisplayCore/*"
+            "macos/com.jingjing2222.macdisplaybar-macOS/NativeDisplayControl/*"
+            "macos/com.jingjing2222.macdisplaybar-macOS/NativeFoo/*"
+            "macos/com.jingjing2222.macdisplaybar-macOS/com.jingjing2222.macdisplaybar.entitlements"
+            "macos/com.jingjing2222.macdisplaybar-macOS/main.m"
+            "macos/com.jingjing2222.macdisplaybar.xcodeproj/project.pbxproj"
+            "macos/Podfile"
+            "macos/Podfile.lock"
+            "macos/PrivacyInfo.xcprivacy"
+          )
+
+          changed=false
+          while IFS= read -r path; do
+            for fingerprint_input in "${fingerprint_inputs[@]}"; do
+              if [[ "$path" == $fingerprint_input ]]; then
+                changed=true
+                break 2
+              fi
+            done
+          done < <(git diff --name-only "$base_sha" "$head_sha")
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
   js-checks:
     name: ${{ matrix.name }}
     runs-on: macos-15
@@ -95,6 +148,8 @@ jobs:
   build:
     name: Build macOS app
     runs-on: macos-15
+    needs: fingerprint-changes
+    if: needs.fingerprint-changes.outputs.changed == 'true'
     env:
       HOT_UPDATER_BASE_URL: https://example.invalid
     steps:
