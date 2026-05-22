@@ -7,6 +7,7 @@
     "macos:release": "react-native run-macos --mode Release",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "check:fonts": "node scripts/check-inter-font-family.mjs",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "start": "react-native start",
@@ -40,6 +41,9 @@
     "vitest": "^4.1.7",
     "wrangler": "^4.93.1"
   },
+  "resolutions": {
+    "@hot-updater/cli-tools@npm:0.32.0": "patch:@hot-updater/cli-tools@npm%3A0.32.0#~/.yarn/patches/@hot-updater-cli-tools-npm-0.32.0-0cfa35164e.patch"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -50,6 +54,7 @@
     "jsSrcsDir": "specs",
     "ios": {
       "modulesProvider": {
+        "NativeDisplayControl": "RCTNativeDisplayControl",
         "NativeFoo": "RCTNativeFoo"
       }
     }

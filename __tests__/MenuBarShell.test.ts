@@ -10,6 +10,27 @@ const appDelegate = readFileSync(
   join(repoRoot, 'macos/com.jingjing2222.macdisplaybar-macOS/AppDelegate.mm'),
   'utf8',
 );
+const xcodeProject = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar.xcodeproj/project.pbxproj',
+  ),
+  'utf8',
+);
+const xcodeScheme = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar.xcodeproj/xcshareddata/xcschemes/com.jingjing2222.macdisplaybar-macOS.xcscheme',
+  ),
+  'utf8',
+);
+const mainStoryboard = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar-macOS/Base.lproj/Main.storyboard',
+  ),
+  'utf8',
+);
 
 test('macOS bundle is configured as a menu bar only app', () => {
   expect(infoPlist).toMatch(/<key>LSUIElement<\/key>\s*<true\/>/);
@@ -31,6 +52,7 @@ test('React Native host view is moved into an NSPopover backed by NSStatusItem',
 test('menu bar shell uses the bundled template status bar icon', () => {
   expect(appDelegate).toContain('[NSImage imageNamed:@"StatusBarIcon"]');
   expect(appDelegate).toContain('[statusImage setTemplate:YES]');
+  expect(appDelegate).toContain('button.toolTip = @"macDisplayBar"');
   expect(appDelegate).not.toContain('imageWithSystemSymbolName:@"display"');
 });
 
@@ -41,4 +63,21 @@ test('startup window is hidden from normal window and app switcher flows', () =>
   expect(appDelegate).toContain('[self.reactHostWindow orderOut:nil]');
   expect(appDelegate).toContain('NSWindowCollectionBehaviorIgnoresCycle');
   expect(appDelegate).not.toContain('makeKeyAndOrderFront');
+});
+
+test('macOS app exposes the product name used by Spotlight and system menus', () => {
+  expect(infoPlist).toMatch(
+    /<key>CFBundleDisplayName<\/key>\s*<string>macDisplayBar<\/string>/,
+  );
+  expect(infoPlist).toMatch(
+    /<key>CFBundleName<\/key>\s*<string>macDisplayBar<\/string>/,
+  );
+  expect(xcodeProject).toContain('PRODUCT_NAME = macDisplayBar;');
+  expect(xcodeProject).toContain('productName = macDisplayBar;');
+  expect(xcodeProject).toContain('path = macDisplayBar.app;');
+  expect(xcodeScheme).toContain('BuildableName = "macDisplayBar.app"');
+  expect(mainStoryboard).toContain('title="macDisplayBar"');
+  expect(mainStoryboard).not.toContain(
+    'title="com.jingjing2222.macdisplaybar"',
+  );
 });

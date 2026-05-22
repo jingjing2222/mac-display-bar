@@ -1,0 +1,346 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const repoRoot = process.cwd();
+const spec = readFileSync(
+  join(repoRoot, 'specs/NativeDisplayControl.ts'),
+  'utf8',
+);
+const app = readFileSync(join(repoRoot, 'App.tsx'), 'utf8');
+const displayControlApi = readFileSync(
+  join(repoRoot, 'src/native/displayControlApi.ts'),
+  'utf8',
+);
+const displayControlHook = readFileSync(
+  join(repoRoot, 'src/hooks/display/useDisplayControl.ts'),
+  'utf8',
+);
+const displayList = readFileSync(
+  join(repoRoot, 'src/components/DisplayList.tsx'),
+  'utf8',
+);
+const topLevelDisplayHookPath = join(
+  repoRoot,
+  'src/hooks/useDisplayControl.ts',
+);
+const bridge = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar-macOS/NativeDisplayControl/RCTNativeDisplayControl.mm',
+  ),
+  'utf8',
+);
+const displayCoreHeader = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar-macOS/DisplayCore/RCTDisplayCore.h',
+  ),
+  'utf8',
+);
+const displayCore = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar-macOS/DisplayCore/RCTDisplayCore.mm',
+  ),
+  'utf8',
+);
+const project = readFileSync(
+  join(
+    repoRoot,
+    'macos/com.jingjing2222.macdisplaybar.xcodeproj/project.pbxproj',
+  ),
+  'utf8',
+);
+
+const requiredMethods = [
+  'getSnapshot',
+  'refreshSnapshot',
+  'setNativeBrightness',
+  'setSoftwareDimming',
+  'setDdcControl',
+  'setDisplayMode',
+  'saveFavoriteMode',
+  'removeFavoriteMode',
+  'setDisplayOrigin',
+  'savePreset',
+  'applyPreset',
+  'deletePreset',
+  'setColorProfile',
+  'resetColorProfile',
+  'saveProtectedLayout',
+  'restoreProtectedLayout',
+  'clearProtectedLayout',
+  'saveSyncGroup',
+  'applySyncGroup',
+  'deleteSyncGroup',
+  'exportEdid',
+  'queueEdidOverride',
+  'clearEdidOverride',
+  'writeOverrideBundle',
+  'addCustomResolution',
+  'removeCustomResolution',
+  'setDisplayRotation',
+  'enableXdrUpscale',
+  'disableXdrUpscale',
+  'softDisconnectDisplay',
+  'reconnectDisplay',
+  'setSettings',
+];
+
+const snapshotFields = [
+  'moduleStatus',
+  'generatedAt',
+  'platform',
+  'architecture',
+  'machineModel',
+  'isAppleSilicon',
+  'displayTopologyRevision',
+  'displayTopologyStatus',
+  'displayTopologyChangedAt',
+  'displays',
+  'presets',
+  'syncGroups',
+  'layoutProtectionEnabled',
+  'layoutProtectionStatus',
+  'layoutDriftCount',
+  'settings',
+];
+
+const displayFields = [
+  'id',
+  'name',
+  'connectionType',
+  'isPrimary',
+  'isBuiltin',
+  'isOnline',
+  'isActive',
+  'isAsleep',
+  'isMirrored',
+  'isHardwareMirrored',
+  'mirrorsDisplayID',
+  'identity',
+  'rotation',
+  'frame',
+  'currentMode',
+  'availableModes',
+  'modeStatus',
+  'modeError',
+  'nativeBrightness',
+  'brightnessControl',
+  'brightnessError',
+  'softwareDimming',
+  'supportsBrightness',
+  'supportsSoftwareDimming',
+  'supportsDdc',
+  'ddc',
+  'supportsHdr',
+  'hdr',
+  'colorProfileStatus',
+  'colorProfileError',
+  'colorProfiles',
+  'advanced',
+];
+
+const identityFields = [
+  'uuid',
+  'vendorID',
+  'modelID',
+  'serialNumber',
+  'productName',
+  'transport',
+];
+
+const ddcFields = [
+  'brightness',
+  'contrast',
+  'volume',
+  'inputSource',
+  'readStatus',
+  'lastError',
+];
+
+const hdrFields = [
+  'isSupported',
+  'isActive',
+  'currentHeadroom',
+  'potentialHeadroom',
+  'referenceHeadroom',
+  'xdrPreset',
+];
+
+const advancedFields = [
+  'supportsEdidExport',
+  'edidBytes',
+  'edidExportPath',
+  'edidOverridePath',
+  'edidOverrideStatus',
+  'overrideBundlePath',
+  'overrideBundleStatus',
+  'rotationRequest',
+  'rotationStatus',
+  'softConnectionState',
+  'xdrUpscaleState',
+  'lastOperation',
+  'lastOperationAt',
+  'customResolutions',
+];
+
+const settingsFields = [
+  'autoRefresh',
+  'refreshIntervalSeconds',
+  'showAdvancedMetadata',
+];
+
+test('NativeDisplayControl spec exposes the BetterDisplay phase-three control surface', () => {
+  for (const method of requiredMethods) {
+    expect(spec).toContain(`${method}(`);
+  }
+
+  expect(spec).toContain(
+    "TurboModuleRegistry.get<Spec>('NativeDisplayControl')",
+  );
+});
+
+test('native bridge and display core publish the same control surface', () => {
+  for (const method of requiredMethods) {
+    expect(bridge).toContain(`- (NSDictionary *)${method}`);
+    expect(displayCoreHeader).toContain(`- (NSDictionary *)${method}`);
+  }
+
+  expect(bridge).toContain('return @"NativeDisplayControl"');
+});
+
+test('macOS project builds the display control engine and bridge', () => {
+  expect(project).toContain('RCTNativeDisplayControl.mm in Sources');
+  expect(project).toContain('RCTDisplayCore.mm in Sources');
+});
+
+test('snapshot contract covers display identity, control state, and advanced operations', () => {
+  for (const field of snapshotFields) {
+    expect(spec).toContain(`${field}:`);
+    expect(displayCore).toContain(`@"${field}"`);
+  }
+
+  for (const field of displayFields) {
+    expect(spec).toContain(`${field}:`);
+    expect(displayCore).toContain(`@"${field}"`);
+  }
+
+  for (const field of [
+    ...identityFields,
+    ...ddcFields,
+    ...hdrFields,
+    ...advancedFields,
+    ...settingsFields,
+  ]) {
+    expect(spec).toContain(`${field}:`);
+    expect(displayCore).toContain(`@"${field}"`);
+  }
+});
+
+test('native API wrapper owns direct TurboModule calls', () => {
+  for (const method of requiredMethods.filter(
+    (method) => !['getSnapshot'].includes(method),
+  )) {
+    expect(displayControlApi).toContain(`NativeDisplayControl?.${method}`);
+  }
+
+  expect(app).not.toContain('NativeDisplayControl?.');
+  expect(app).toContain('./src/hooks/display/useDisplayControl');
+  expect(displayControlHook).toContain('useDisplaySnapshot');
+  expect(displayControlHook).toContain('useDisplayControlActions');
+  expect(existsSync(topLevelDisplayHookPath)).toBe(false);
+});
+
+test('menu popover content scrolls as one panel', () => {
+  expect(app).toContain('ScrollView');
+  expect(app).toContain('contentContainerStyle={styles.panelContent}');
+  expect(displayList).not.toContain(
+    'contentContainerStyle={styles.displayListContent}',
+  );
+});
+
+test('custom resolution drafts follow current mode snapshot changes', () => {
+  expect(displayList).toContain('const modeDraft = useMemo');
+  expect(displayList).toContain('setCustomWidth(modeDraft.width)');
+  expect(displayList).toContain('setCustomHeight(modeDraft.height)');
+  expect(displayList).toContain('setCustomRefreshRate(modeDraft.refreshRate)');
+  expect(displayList).toContain('display.id');
+});
+
+test('display snapshots do not mutate AppKit dimming windows', () => {
+  const displayDictionaryMethod = displayCore.slice(
+    displayCore.indexOf('- (NSDictionary *)dictionaryForDisplay:'),
+    displayCore.indexOf('- (NSDictionary *)identityForDisplayID:'),
+  );
+
+  expect(displayDictionaryMethod).not.toContain(
+    'syncDimmingWindowForDisplayID',
+  );
+  expect(displayCore).toContain('if (![NSThread isMainThread])');
+  expect(displayCore).toContain('dispatch_async(dispatch_get_main_queue()');
+});
+
+test('display snapshots keep AppKit access narrow and on the main thread', () => {
+  const screenMetadataMethod = displayCore.slice(
+    displayCore.indexOf(
+      '- (NSDictionary<NSString *, NSDictionary *> *)screenMetadataForActiveDisplays',
+    ),
+    displayCore.indexOf('- (NSDictionary *)dictionaryForDisplay:'),
+  );
+  const displayDictionaryMethod = displayCore.slice(
+    displayCore.indexOf('- (NSDictionary *)dictionaryForDisplay:'),
+    displayCore.indexOf('- (NSDictionary *)identityForDisplayID:'),
+  );
+  const hdrProbeMethod = displayCore.slice(
+    displayCore.indexOf('- (BOOL)displaySupportsHdrForDisplayID:'),
+    displayCore.indexOf('- (BOOL)screenSupportsHdr:'),
+  );
+  const xdrUpscaleMethod = displayCore.slice(
+    displayCore.indexOf('- (NSDictionary *)enableXdrUpscale:'),
+    displayCore.indexOf('- (NSDictionary *)disableXdrUpscale:'),
+  );
+
+  expect(screenMetadataMethod).toContain(
+    'dispatch_sync(dispatch_get_main_queue()',
+  );
+  expect(screenMetadataMethod).toContain('NSScreen.screens');
+  expect(displayDictionaryMethod).not.toContain('screenForDisplayID');
+  expect(displayDictionaryMethod).not.toContain('hdrStateForScreen:screen');
+  expect(hdrProbeMethod).toContain('dispatch_sync(dispatch_get_main_queue()');
+  expect(xdrUpscaleMethod).toContain('displaySupportsHdrForDisplayID');
+  expect(xdrUpscaleMethod).not.toContain('screenForDisplayID');
+});
+
+test('display snapshots do not perform live DDC I2C reads on the main thread', () => {
+  const ddcStateMethod = displayCore.slice(
+    displayCore.indexOf('- (NSDictionary *)ddcStateForDisplayIDString:'),
+    displayCore.indexOf('- (void)refreshDdcValuesForActiveDisplays'),
+  );
+
+  expect(ddcStateMethod).not.toContain('refreshDdcValuesForDisplayID');
+  expect(ddcStateMethod).not.toContain('readDdcVcpForDisplayID');
+  expect(displayCore).toContain('@"readStatus" : self.ddcReadStatus');
+});
+
+test('manual refresh updates live DDC values outside snapshot mapping', () => {
+  const refreshSnapshotMethod = displayCore.slice(
+    displayCore.indexOf('- (NSDictionary *)refreshSnapshot'),
+    displayCore.indexOf('- (NSDictionary *)setNativeBrightness:'),
+  );
+
+  expect(refreshSnapshotMethod).toContain('refreshDdcValuesForActiveDisplays');
+  expect(displayCore).toContain('- (void)refreshDdcValuesForActiveDisplays');
+});
+
+test('layout drift detection follows identity fallback when display IDs change', () => {
+  expect(displayCore).toContain(
+    '[self resolveDisplayIDString:storedDisplayID storedState:protectedFrame]',
+  );
+  expect(displayCore).toContain(
+    'NSMutableSet<NSString *> *matchedCurrentDisplayIDs',
+  );
+  expect(displayCore).toContain(
+    '[matchedCurrentDisplayIDs containsObject:displayID]',
+  );
+});

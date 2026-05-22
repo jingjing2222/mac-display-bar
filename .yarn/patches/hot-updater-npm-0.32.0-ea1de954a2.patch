@@ -1,25 +1,122 @@
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87e2f11519 100755
+index 7eca8631bbec800f5b384a3669873e4bbd65e44e..6a1f43f6ae10fc9d52b7eb559b416b08c0483e68 100755
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -3843,7 +3843,7 @@ var require_valid$1 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+@@ -3842,8 +3842,8 @@ var require_valid$1 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+ //#endregion
  //#region src/commandOptions/index.ts
  var import_valid = /* @__PURE__ */ __toESM(require_valid$1(), 1);
- const PLATFORMS = ["ios", "android"];
+-const PLATFORMS = ["ios", "android"];
 -const platformCommandOption = new Option("-p, --platform <platform>", "specify the platform").choices(["ios", "android"]);
++const PLATFORMS = ["ios", "android", "macos"];
 +const platformCommandOption = new Option("-p, --platform <platform>", "specify the platform").choices(["ios", "android", "macos"]);
  const interactiveCommandOption = new Option("-i, --interactive", "interactive mode").default(false);
  const nativeBuildSchemeCommandOption = new Option("-s, --scheme <scheme>", "predefined scheme for the native build configuration");
  const nativeBuildOutputCommandOption = new Option("-o, --output-path <outputPath>", "the path where the artifacts will be generated");
-@@ -22883,6 +22883,7 @@ const getIOSVersion = async ({ parser, validateWithSemver = false }) => {
+@@ -22864,10 +22864,56 @@ const getIOSVersionFromXcodeProject = async () => {
+ 		return null;
+ 	}
+ };
++const getMacOSVersionFromInfoPlist = async () => {
++	try {
++		const [plistPath] = import_out.default.globSync("**/Info.plist", {
++			cwd: path.join(getCwd(), "macos"),
++			absolute: true,
++			onlyFiles: true,
++			ignore: [
++				"**/Pods/**",
++				"**/build/**",
++				"**/Build/**",
++				"**/*.app/**",
++				"**/*.xcarchive/**"
++			]
++		});
++		if (!plistPath) return null;
++		return parsePlist(await fs$3.readFile(plistPath))["CFBundleShortVersionString"] ?? null;
++	} catch {
++		return null;
++	}
++};
++const getMacOSVersionFromXcodeProject = async () => {
++	try {
++		const [xcodeprojPath] = import_out.default.globSync("*.xcodeproj/project.pbxproj", {
++			cwd: path.join(getCwd(), "macos"),
++			absolute: true,
++			onlyFiles: true
++		});
++		if (!xcodeprojPath) return null;
++		const objects = import_build.XcodeProject.open(xcodeprojPath).toJSON().objects ?? {};
++		for (const key of Object.keys(objects)) {
++			const obj = objects[key];
++			if (!obj || typeof obj !== "object") continue;
++			const record = obj;
++			if (record.isa !== "XCBuildConfiguration" || record.name !== "Release") continue;
++			const marketingVersion = record.buildSettings?.MARKETING_VERSION;
++			if (marketingVersion) return marketingVersion;
++		}
++		return null;
++	} catch {
++		return null;
++	}
++};
+ const IOSVersionParsers = {
+ 	xcodeproj: getIOSVersionFromXcodeProject,
+ 	"info-plist": getIOSVersionFromInfoPlist
+ };
++const MACOSVersionParsers = {
++	xcodeproj: getMacOSVersionFromXcodeProject,
++	"info-plist": getMacOSVersionFromInfoPlist
++};
+ const getIOSVersion = async ({ parser, validateWithSemver = false }) => {
+ 	const parsers = Array.isArray(parser) ? parser : [parser];
+ 	for (const parserKey of parsers) {
+@@ -22878,11 +22924,22 @@ const getIOSVersion = async ({ parser, validateWithSemver = false }) => {
+ 	}
+ 	return null;
+ };
++const getMacOSVersion = async ({ parser, validateWithSemver = false }) => {
++	const parsers = Array.isArray(parser) ? parser : [parser];
++	for (const parserKey of parsers) {
++		const parsedVersion = await MACOSVersionParsers[parserKey]();
++		if (!parsedVersion) continue;
++		if (validateWithSemver && !(0, import_valid.default)(parsedVersion)) continue;
++		return parsedVersion;
++	}
++	return null;
++};
+ //#endregion
+ //#region src/utils/version/getNativeAppVersion.ts
  const getNativeAppVersion = async (platform) => {
  	switch (platform) {
  		case "ios": return getIOSVersion({ parser: ["xcodeproj", "info-plist"] });
-+		case "macos": return getIOSVersion({ parser: ["xcodeproj", "info-plist"] });
++		case "macos": return getMacOSVersion({ parser: ["xcodeproj", "info-plist"] });
  		case "android": return getAndroidVersion({ parser: "app-build-gradle" });
  		default: return null;
  	}
-@@ -29735,6 +29736,9 @@ const getPlatform = async (message) => {
+@@ -22890,10 +22947,11 @@ const getNativeAppVersion = async (platform) => {
+ //#endregion
+ //#region src/commands/appVersion.ts
+ const readAppVersions = async () => {
+-	const [androidVersion, iosVersion] = await Promise.all([getNativeAppVersion("android"), getNativeAppVersion("ios")]);
++	const [androidVersion, iosVersion, macosVersion] = await Promise.all([getNativeAppVersion("android"), getNativeAppVersion("ios"), getNativeAppVersion("macos")]);
+ 	return {
+ 		android: androidVersion,
+-		ios: iosVersion
++		ios: iosVersion,
++		macos: macosVersion
+ 	};
+ };
+ const handleAppVersion = async (options = {}) => {
+@@ -22902,7 +22960,7 @@ const handleAppVersion = async (options = {}) => {
+ 		console.log(JSON.stringify(versions, null, 2));
+ 		return;
+ 	}
+-	p.log.message(ui.block("App version", [ui.kv("Android", ui.version(versions.android)), ui.kv("iOS", ui.version(versions.ios))]));
++	p.log.message(ui.block("App version", [ui.kv("Android", ui.version(versions.android)), ui.kv("iOS", ui.version(versions.ios)), ui.kv("macOS", ui.version(versions.macos))]));
+ };
+ //#endregion
+ //#region ../../node_modules/.pnpm/is-plain-obj@4.1.0/node_modules/is-plain-obj/index.js
+@@ -29735,6 +29793,9 @@ const getPlatform = async (message) => {
  		}, {
  			label: "android",
  			value: "android"
@@ -29,17 +126,17 @@ index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87
  		}]
  	});
  };
-@@ -30035,6 +30039,9 @@ const getDefaultTargetAppVersion = async (platform) => {
+@@ -30035,6 +30096,9 @@ const getDefaultTargetAppVersion = async (platform) => {
  		case "ios":
  			version = await getIOSVersion({ parser: "info-plist" });
  			break;
 +		case "macos":
-+			version = await getIOSVersion({ parser: "info-plist" });
++			version = await getMacOSVersion({ parser: "info-plist" });
 +			break;
  		case "android":
  			version = await getAndroidVersion({ parser: "app-build-gradle" });
  			break;
-@@ -30215,14 +30222,14 @@ const getUniqueContentAddressedAssetUploadTargets = ({ manifest, targetFiles })
+@@ -30215,14 +30279,14 @@ const getUniqueContentAddressedAssetUploadTargets = ({ manifest, targetFiles })
  	}
  	return [...targets.values()];
  };
@@ -56,7 +153,7 @@ index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87
  		return null;
  	}
  	return [platform];
-@@ -30310,7 +30317,7 @@ const deployPlatform = async ({ options, platform, platformIndex, platformCount
+@@ -30310,7 +30374,7 @@ const deployPlatform = async ({ options, platform, platformIndex, platformCount
  				showFingerprintDiff(await getFingerprintDiff(projectFingerprint[platform], {
  					platform,
  					...config.fingerprint
@@ -65,7 +162,7 @@ index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87
  			} catch {
  				p.log.warn("Could not generate fingerprint diff");
  			}
-@@ -30330,7 +30337,7 @@ const deployPlatform = async ({ options, platform, platformIndex, platformCount
+@@ -30330,7 +30394,7 @@ const deployPlatform = async ({ options, platform, platformIndex, platformCount
  		}) : defaultTargetAppVersion);
  		if (p.isCancel(targetAppVersion)) return null;
  		if (!targetAppVersion) {
@@ -74,7 +171,7 @@ index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87
  			return null;
  		}
  		target.appVersion = targetAppVersion;
-@@ -30769,7 +30776,7 @@ const createPatch = async (options) => {
+@@ -30769,7 +30833,7 @@ const createPatch = async (options) => {
  	const platform = options.platform ?? (options.interactive ? await getPlatform("Which platform does this patch target?") : null);
  	if (p.isCancel(platform)) return;
  	if (!platform) {
@@ -83,7 +180,7 @@ index 7eca8631bbec800f5b384a3669873e4bbd65e44e..11fccb2c285679269e67ae5c7b449e87
  		return;
  	}
  	const config = await loadConfig({
-@@ -30780,7 +30787,7 @@ const createPatch = async (options) => {
+@@ -30780,7 +30844,7 @@ const createPatch = async (options) => {
  	try {
  		p.note([
  			`Channel: ${options.channel}`,

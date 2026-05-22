@@ -2394,6 +2394,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@hot-updater/cli-tools@patch:@hot-updater/cli-tools@npm%3A0.32.0#~/.yarn/patches/@hot-updater-cli-tools-npm-0.32.0-0cfa35164e.patch":
+  version: 0.32.0
+  resolution: "@hot-updater/cli-tools@patch:@hot-updater/cli-tools@npm%3A0.32.0#~/.yarn/patches/@hot-updater-cli-tools-npm-0.32.0-0cfa35164e.patch::version=0.32.0&hash=b46d39"
+  dependencies:
+    "@hot-updater/core": "npm:0.32.0"
+    "@hot-updater/plugin-core": "npm:0.32.0"
+    oxc-transform: "npm:0.121.0"
+    typescript: "npm:6.0.2"
+    unconfig: "npm:7.5.0"
+  checksum: 10c0/9f80d1686dc74e0e34d64e451527a373973cfa71032d4cf03141beb9e296c1f0bcee8d24c53a915a11cd5a0cc042f8162b1247eefc3d5b1b3c22356d7f5db0a0
+  languageName: node
+  linkType: hard
+
 "@hot-updater/cloudflare@npm:0.32.0":
   version: 0.32.0
   resolution: "@hot-updater/cloudflare@npm:0.32.0"
@@ -6591,7 +6604,7 @@ __metadata:
 
 "hot-updater@patch:hot-updater@npm%3A0.32.0#~/.yarn/patches/hot-updater-npm-0.32.0-ea1de954a2.patch":
   version: 0.32.0
-  resolution: "hot-updater@patch:hot-updater@npm%3A0.32.0#~/.yarn/patches/hot-updater-npm-0.32.0-ea1de954a2.patch::version=0.32.0&hash=c6cc1a"
+  resolution: "hot-updater@patch:hot-updater@npm%3A0.32.0#~/.yarn/patches/hot-updater-npm-0.32.0-ea1de954a2.patch::version=0.32.0&hash=dabaf4"
   dependencies:
     "@hot-updater/android-helper": "npm:0.32.0"
     "@hot-updater/apple-helper": "npm:0.32.0"
@@ -6622,7 +6635,7 @@ __metadata:
       optional: true
   bin:
     hot-updater: dist/index.mjs
-  checksum: 10c0/c878f4878afb19273237116f2edcbf996525c0fa3b3cb2f9afb80539bc4b87733ea05bd916406dae0ecdab0b1a83f79d68488e160cdb22c65729d76c3f2f06d4
+  checksum: 10c0/ffb944b36e53f99cece272b41f99003b7e130b5a7661dd92eb5a7938e5ec30c9166c3b4b44e3ee68b89a93989905e8470853716a38df294b55e791d8589432c4
   languageName: node
   linkType: hard
 

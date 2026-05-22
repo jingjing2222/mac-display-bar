@@ -1,0 +1,47 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index ba248bdd7fd226bc1275f83314ac436ec89179eb..622828663af13c3256f2e4b1461de6204b3efb3b 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -42912,6 +42912,22 @@ const getDefaultPlatformConfig = () => {
+ 		});
+ 		if (plistFiles.length > 0) infoPlistPaths = plistFiles.map((file) => `ios/${file}`);
+ 	} catch {}
++	let macosInfoPlistPaths = [];
++	try {
++		const plistFiles = import_out.default.sync("**/Info.plist", {
++			cwd: path.join(getCwd(), "macos"),
++			absolute: false,
++			onlyFiles: true,
++			ignore: [
++				"**/Pods/**",
++				"**/build/**",
++				"**/Build/**",
++				"**/*.app/**",
++				"**/*.xcarchive/**"
++			]
++		});
++		if (plistFiles.length > 0) macosInfoPlistPaths = plistFiles.map((file) => `macos/${file}`);
++	} catch {}
+ 	let androidManifestPaths = [];
+ 	try {
+ 		const manifestFiles = import_out.default.sync(path.join("**", "AndroidManifest.xml"), {
+@@ -42936,7 +42952,8 @@ const getDefaultPlatformConfig = () => {
+ 			androidManifestPaths,
+ 			stringResourcePaths
+ 		},
+-		ios: { infoPlistPaths }
++		ios: { infoPlistPaths },
++		macos: { infoPlistPaths: macosInfoPlistPaths }
+ 	};
+ };
+ const getDefaultConfig = () => {
+@@ -42954,7 +42971,8 @@ const getDefaultConfig = () => {
+ 		platform: getDefaultPlatformConfig(),
+ 		nativeBuild: {
+ 			android: {},
+-			ios: {}
++			ios: {},
++			macos: {}
+ 		},
+ 		build: () => {
+ 			throw new Error("build plugin is required");

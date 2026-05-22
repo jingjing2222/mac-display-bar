@@ -41,7 +41,7 @@
 
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   NSStatusBarButton *button = self.statusItem.button;
-  button.toolTip = @"Mac Display Bar";
+  button.toolTip = @"macDisplayBar";
   button.target = self;
   button.action = @selector(toggleStatusPopover:);
 
