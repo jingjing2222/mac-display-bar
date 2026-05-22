@@ -56,6 +56,16 @@ test('menu bar shell uses the bundled template status bar icon', () => {
   expect(appDelegate).not.toContain('imageWithSystemSymbolName:@"display"');
 });
 
+test('status item right click exposes a quit menu', () => {
+  expect(appDelegate).toContain(
+    '[button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp]',
+  );
+  expect(appDelegate).toContain('NSEventTypeRightMouseUp');
+  expect(appDelegate).toContain('popUpContextMenu');
+  expect(appDelegate).toContain('initWithTitle:@"Quit macDisplayBar"');
+  expect(appDelegate).toContain('[NSApp terminate:sender]');
+});
+
 test('startup window is hidden from normal window and app switcher flows', () => {
   expect(appDelegate).toContain(
     'self.reactHostWindow.contentViewController = nil',

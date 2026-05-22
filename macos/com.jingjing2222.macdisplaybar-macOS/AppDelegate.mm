@@ -44,6 +44,7 @@
   button.toolTip = @"macDisplayBar";
   button.target = self;
   button.action = @selector(toggleStatusPopover:);
+  [button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
 
   NSImage *statusImage = [NSImage imageNamed:@"StatusBarIcon"];
   [statusImage setTemplate:YES];
@@ -59,6 +60,13 @@
 - (void)toggleStatusPopover:(id)sender
 {
   NSStatusBarButton *button = self.statusItem.button;
+  NSEvent *event = NSApp.currentEvent;
+
+  if (event.type == NSEventTypeRightMouseUp) {
+    [self.statusPopover performClose:sender];
+    [NSMenu popUpContextMenu:[self statusContextMenu] withEvent:event forView:button];
+    return;
+  }
 
   if (self.statusPopover.shown) {
     [self.statusPopover performClose:sender];
@@ -68,6 +76,23 @@
   [self.statusPopover showRelativeToRect:button.bounds
                                   ofView:button
                            preferredEdge:NSRectEdgeMinY];
+}
+
+- (NSMenu *)statusContextMenu
+{
+  NSMenu *menu = [NSMenu new];
+  NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit macDisplayBar"
+                                                   action:@selector(quitApplication:)
+                                            keyEquivalent:@"q"];
+  quitItem.target = self;
+  [menu addItem:quitItem];
+
+  return menu;
+}
+
+- (void)quitApplication:(id)sender
+{
+  [NSApp terminate:sender];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification
