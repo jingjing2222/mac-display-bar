@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 
 const projectRoot = path.resolve(__dirname, '..');
 
-for (const fileName of ['.env', '.env.local']) {
+for (const fileName of ['.env', '.env.hotupdater', '.env.local']) {
   const envPath = path.join(projectRoot, fileName);
 
   if (fs.existsSync(envPath)) {
