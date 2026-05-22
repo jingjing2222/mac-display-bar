@@ -34,7 +34,28 @@ export function ResolutionPicker({
   const modes = favorites.length > 0 ? favorites : display.availableModes;
   const previewModes = modes.slice(0, 3);
   const selectMode = (modeID: string) => {
+    const selectedMode = display.availableModes.find(
+      (mode) => mode.id === modeID,
+    );
+
+    console.info('[macDisplayBar] Resolution picker select requested', {
+      displayID: display.id,
+      modeID,
+      isGeneratedHiDpi: modeID.startsWith(generatedHiDpiModePrefix),
+      requiresOverride: selectedMode?.requiresOverride === true,
+      width: selectedMode?.width,
+      height: selectedMode?.height,
+      refreshRate: selectedMode?.refreshRate,
+    });
+
     if (modeID === display.currentMode.id) {
+      console.info(
+        '[macDisplayBar] Resolution picker select ignored current mode',
+        {
+          displayID: display.id,
+          modeID,
+        },
+      );
       return;
     }
 
@@ -161,6 +182,8 @@ function ModePreviewRow({
   onSelect: (modeID: string) => void;
   t: (key: TranslationKey) => string;
 }) {
+  const requiresInstall = mode.requiresOverride === true;
+
   return (
     <View style={[styles.modeRow, mode.isCurrent && styles.modeSelected]}>
       <Pressable
@@ -185,10 +208,15 @@ function ModePreviewRow({
       <Pressable
         accessibilityRole="button"
         onPress={() =>
-          mode.isFavorite ? onRemoveFavorite(mode.id) : onFavorite(mode.id)
+          requiresInstall
+            ? onSelect(mode.id)
+            : mode.isFavorite
+              ? onRemoveFavorite(mode.id)
+              : onFavorite(mode.id)
         }
         style={({ pressed }) => [
           styles.favorite,
+          requiresInstall && styles.install,
           mode.isFavorite && styles.favoriteSelected,
           pressed && styles.modePressed,
         ]}
@@ -196,10 +224,15 @@ function ModePreviewRow({
         <Text
           style={[
             styles.favoriteText,
+            requiresInstall && styles.installText,
             mode.isFavorite && styles.modeTextSelected,
           ]}
         >
-          {mode.isFavorite ? t('savedFavorite') : t('saveFavorite')}
+          {requiresInstall
+            ? t('install')
+            : mode.isFavorite
+              ? t('savedFavorite')
+              : t('saveFavorite')}
         </Text>
       </Pressable>
     </View>
@@ -401,11 +434,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#00ca8e',
     borderColor: '#00ca8e',
   },
+  install: {
+    backgroundColor: '#2b89ff',
+    borderColor: '#2b89ff',
+  },
   favoriteText: {
     color: '#b2b6bd',
     fontFamily: font.family,
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 15,
+  },
+  installText: {
+    color: '#ffffff',
   },
 });

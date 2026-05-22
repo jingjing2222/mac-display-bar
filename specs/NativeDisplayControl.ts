@@ -9,6 +9,7 @@ export type DisplayControlMode = {
   isHiDpi: boolean;
   isCurrent: boolean;
   isFavorite: boolean;
+  requiresOverride?: boolean;
 };
 
 export type DisplayControlDdcState = {

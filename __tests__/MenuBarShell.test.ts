@@ -61,6 +61,14 @@ test('menu bar shell uses the bundled template status bar icon', () => {
   expect(appDelegate).not.toContain('imageWithSystemSymbolName:@"display"');
 });
 
+test('menu bar app installs a minimal main menu to avoid AppKit submenu inconsistencies', () => {
+  expect(appDelegate).toContain('- (void)configureMainMenu');
+  expect(appDelegate).toContain(
+    'NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@"Main Menu"]',
+  );
+  expect(appDelegate).toContain('NSApp.mainMenu = mainMenu');
+});
+
 test('status item right click exposes a quit menu', () => {
   expect(appDelegate).toContain(
     '[button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp]',
@@ -80,6 +88,18 @@ test('menu bar popover closes when focus moves outside the app', () => {
   expect(appDelegate).toContain('addGlobalMonitorForEventsMatchingMask');
   expect(appDelegate).toContain('removeMonitor:self.outsideClickMonitor');
   expect(appDelegate).toContain('popoverDidClose:');
+});
+
+test('menu bar popover stays open while an admin install prompt is active', () => {
+  expect(appDelegate).toContain(
+    'RCTDisplayPrivilegedInstallWillBeginNotification',
+  );
+  expect(appDelegate).toContain('privilegedPromptDepth');
+  expect(appDelegate).toContain('NSPopoverBehaviorApplicationDefined');
+  expect(appDelegate).toContain(
+    'shouldKeepStatusPopoverOpenForPrivilegedPrompt',
+  );
+  expect(appDelegate).toContain('NSPopoverBehaviorTransient');
 });
 
 test('startup window is hidden from normal window and app switcher flows', () => {

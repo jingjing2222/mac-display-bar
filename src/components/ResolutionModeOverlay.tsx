@@ -151,6 +151,8 @@ function ModeOverlayRow({
   onSelect: (modeID: string) => void;
   t: (key: TranslationKey) => string;
 }) {
+  const requiresInstall = mode.requiresOverride === true;
+
   return (
     <View style={[styles.row, mode.isCurrent && styles.rowSelected]}>
       <Pressable
@@ -172,10 +174,15 @@ function ModeOverlayRow({
       <Pressable
         accessibilityRole="button"
         onPress={() =>
-          mode.isFavorite ? onRemoveFavorite(mode.id) : onFavorite(mode.id)
+          requiresInstall
+            ? onSelect(mode.id)
+            : mode.isFavorite
+              ? onRemoveFavorite(mode.id)
+              : onFavorite(mode.id)
         }
         style={({ pressed }) => [
           styles.favoriteButton,
+          requiresInstall && styles.installButton,
           mode.isFavorite && styles.favoriteButtonSelected,
           pressed && styles.rowPressed,
         ]}
@@ -183,10 +190,15 @@ function ModeOverlayRow({
         <Text
           style={[
             styles.favoriteText,
+            requiresInstall && styles.installText,
             mode.isFavorite && styles.favoriteTextSelected,
           ]}
         >
-          {mode.isFavorite ? t('savedFavorite') : t('saveFavorite')}
+          {requiresInstall
+            ? t('install')
+            : mode.isFavorite
+              ? t('savedFavorite')
+              : t('saveFavorite')}
         </Text>
       </Pressable>
     </View>
@@ -396,6 +408,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#00ca8e',
     borderColor: '#00ca8e',
   },
+  installButton: {
+    backgroundColor: '#2b89ff',
+    borderColor: '#2b89ff',
+  },
   favoriteText: {
     color: '#b2b6bd',
     fontFamily: font.family,
@@ -404,6 +420,9 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   favoriteTextSelected: {
+    color: '#ffffff',
+  },
+  installText: {
     color: '#ffffff',
   },
   empty: {

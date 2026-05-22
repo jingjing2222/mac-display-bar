@@ -349,6 +349,27 @@ test('generated HiDPI selections install overrides and do not fall back to stand
   expect(displayCore).toContain('installOverrideBundleAtPath');
   expect(displayCore).toContain('with administrator privileges');
   expect(displayCore).toContain('RCTDisplayOverrideInstallDirectory');
+  expect(displayCore).toContain('stagedSourceURL');
+  expect(displayCore).toContain('NSTemporaryDirectory()');
+  expect(displayCore).toContain(
+    'NSString *productFileName = [NSString stringWithFormat:@"DisplayProductID-%x", productID]',
+  );
+  expect(displayCore).not.toContain('DisplayProductID-%x.plist');
+  expect(displayCore).not.toContain('@"IODisplayEDID"');
+  expect(displayCore).not.toContain('@"CustomResolutions" : customResolutions');
+  expect(displayCore).toContain('generatedHiDpiRowsSkippedNonSeed');
+  expect(displayCore).toContain('appendOneKeyHiDpiScaleResolutionsToArray');
+  expect(displayCore).toContain(
+    'oneKeyHiDpiScaleResolutionDataWithLogicalWidth',
+  );
+  expect(displayCore).toContain('installedOneKeyHiDpiRecipeExistsForDisplayID');
+  expect(displayCore).toContain('resolutionRefreshKeyForWidth');
+  expect(displayCore).toContain(
+    '@[ @0x00, @0x00, @0x00, @0x09, @0x00, @0xa0, @0x00, @0x00 ]',
+  );
+  expect(displayCore).toContain(
+    'installed override is not one-key complete; rewriting recipe',
+  );
   expect(generatedModeBranch).toContain(
     'installOverrideBundleAtPath:bundlePath',
   );

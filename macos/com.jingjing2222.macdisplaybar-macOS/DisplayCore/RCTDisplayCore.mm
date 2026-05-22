@@ -40,6 +40,10 @@ static NSString *const RCTDisplaySettingsDefaultsKey = @"displaySettings";
 static NSString *const RCTGeneratedHiDpiModeIDPrefix = @"generated-hidpi";
 static NSString *const RCTDisplayOverrideInstallDirectory =
     @"/Library/Displays/Contents/Resources/Overrides";
+static NSString *const RCTDisplayPrivilegedInstallWillBeginNotification =
+    @"RCTDisplayPrivilegedInstallWillBeginNotification";
+static NSString *const RCTDisplayPrivilegedInstallDidEndNotification =
+    @"RCTDisplayPrivilegedInstallDidEndNotification";
 static const uint8_t RCTDdcDestinationAddress = 0x6E;
 static const uint8_t RCTDdcReplyAddress = 0x6F;
 static const uint8_t RCTDdcHostAddress = 0x51;
@@ -146,6 +150,13 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
                                           height:(double)height
                                      refreshRate:(double)refreshRate
                                          isHiDpi:(BOOL)isHiDpi;
+- (NSSet<NSString *> *)generatedHiDpiRecipeResolutionKeysForWidth:(NSUInteger)width height:(NSUInteger)height;
+- (BOOL)generatedHiDpiRecipeIsExposedInResolutionKeys:(NSSet<NSString *> *)hiDpiResolutionKeys
+                                                width:(NSUInteger)width
+                                               height:(NSUInteger)height;
+- (BOOL)exposedGeneratedHiDpiRecipeExistsForDisplayID:(CGDirectDisplayID)displayID
+                                                width:(NSUInteger)width
+                                               height:(NSUInteger)height;
 
 @end
 
@@ -1340,12 +1351,9 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   CGDirectDisplayID directDisplayID = (CGDirectDisplayID)displayID.integerValue;
   uint32_t vendorID = CGDisplayVendorNumber(directDisplayID);
   uint32_t productID = CGDisplayModelNumber(directDisplayID);
-  uint32_t serialNumber = CGDisplaySerialNumber(directDisplayID);
-  NSData *edidData = [self edidDataForDisplayID:directDisplayID];
   NSArray *customResolutions = self.customResolutionRequests[displayID] ?: @[];
-  NSISO8601DateFormatter *formatter = [NSISO8601DateFormatter new];
   NSString *vendorDirectoryName = [NSString stringWithFormat:@"DisplayVendorID-%x", vendorID];
-  NSString *productFileName = [NSString stringWithFormat:@"DisplayProductID-%x.plist", productID];
+  NSString *productFileName = [NSString stringWithFormat:@"DisplayProductID-%x", productID];
   NSURL *baseDirectoryURL =
       [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject
           URLByAppendingPathComponent:@"MacDisplayBar/Overrides"
@@ -1359,20 +1367,9 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
                                                  error:nil];
 
   NSMutableDictionary *manifest = [@{
-    @"DisplayID" : displayID,
     @"DisplayVendorID" : @(vendorID),
     @"DisplayProductID" : @(productID),
-    @"DisplaySerialNumber" : @(serialNumber),
-    @"GeneratedAt" : [formatter stringFromDate:[NSDate date]],
-    @"TargetInstallDirectory" :
-        RCTDisplayOverrideInstallDirectory,
-    @"RequiresPrivilegedInstall" : @YES,
-    @"CustomResolutions" : customResolutions,
-    @"EdidOverrideSourcePath" : self.edidOverridePaths[displayID] ?: @"",
-    @"RotationRequest" : self.rotationRequests[displayID] ?: @(CGDisplayRotation(directDisplayID)),
-    @"XdrUpscaleState" : self.xdrUpscaleStates[displayID] ?: @"disabled",
-    @"LastOperation" : self.advancedOperations[displayID] ?: @"",
-    @"LastOperationAt" : self.advancedOperationDates[displayID] ?: @"",
+    @"target-default-ppmm" : @10.0699301,
   } mutableCopy];
   NSArray<NSData *> *scaleResolutions = [self scaleResolutionsForCustomResolutions:customResolutions];
 
@@ -1380,9 +1377,10 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     manifest[@"scale-resolutions"] = scaleResolutions;
   }
 
-  if (edidData.length > 0) {
-    manifest[@"IODisplayEDID"] = edidData;
-  }
+  NSLog(@"[macDisplayBar] Display override bundle scale-resolutions prepared: displayID=%@ customResolutionCount=%lu scaleResolutionCount=%lu",
+        displayID,
+        (unsigned long)customResolutions.count,
+        (unsigned long)scaleResolutions.count);
 
   NSError *serializationError = nil;
   NSData *plistData = [NSPropertyListSerialization dataWithPropertyList:manifest
@@ -1418,6 +1416,17 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   NSURL *targetFileURL = [targetDirectoryURL URLByAppendingPathComponent:productFileName];
   NSFileManager *fileManager = [NSFileManager defaultManager];
   NSError *directError = nil;
+  BOOL targetExists = [fileManager fileExistsAtPath:targetFileURL.path];
+
+  NSLog(@"[macDisplayBar] Display override install start: source=%@ target=%@",
+        sourceURL.path,
+        targetFileURL.path);
+
+  if (targetExists && [fileManager contentsEqualAtPath:sourceURL.path andPath:targetFileURL.path]) {
+    NSLog(@"[macDisplayBar] Display override install skipped: target already matches source=%@",
+          targetFileURL.path);
+    return YES;
+  }
 
   [fileManager createDirectoryAtURL:targetDirectoryURL
         withIntermediateDirectories:YES
@@ -1428,13 +1437,51 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     [fileManager removeItemAtURL:targetFileURL error:nil];
 
     if ([fileManager copyItemAtURL:sourceURL toURL:targetFileURL error:&directError]) {
+      NSLog(@"[macDisplayBar] Display override direct install verified: target=%@",
+            targetFileURL.path);
       return YES;
     }
   }
 
+  NSLog(@"[macDisplayBar] Display override direct install failed: target=%@ error=%@",
+        targetFileURL.path,
+        directError.localizedDescription ?: @"");
+
+  NSURL *stagedDirectoryURL = [[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES]
+      URLByAppendingPathComponent:[NSString stringWithFormat:@"macDisplayBar-overrides/%@", [[NSUUID UUID] UUIDString]]
+                      isDirectory:YES];
+  NSURL *stagedSourceURL = [stagedDirectoryURL URLByAppendingPathComponent:productFileName];
+  NSError *stagingError = nil;
+
+  [fileManager createDirectoryAtURL:stagedDirectoryURL
+        withIntermediateDirectories:YES
+                         attributes:nil
+                              error:&stagingError];
+
+  if (stagingError == nil) {
+    [fileManager copyItemAtURL:sourceURL toURL:stagedSourceURL error:&stagingError];
+  }
+
+  if (stagingError != nil) {
+    NSLog(@"[macDisplayBar] Display override privileged install staging failed: source=%@ error=%@",
+          sourceURL.path,
+          stagingError.localizedDescription ?: @"");
+
+    if (errorMessage != nil) {
+      *errorMessage = stagingError.localizedDescription ?: @"Display override staging failed";
+    }
+
+    [fileManager removeItemAtURL:stagedDirectoryURL error:nil];
+    return NO;
+  }
+
+  NSLog(@"[macDisplayBar] Display override privileged install staged source: source=%@ stagedSource=%@",
+        sourceURL.path,
+        stagedSourceURL.path);
+
   NSString *command = [NSString stringWithFormat:@"/bin/mkdir -p %@ && /bin/cp -f %@ %@ && /usr/sbin/chown root:wheel %@ && /bin/chmod 644 %@",
                                                  [self shellQuotedString:targetDirectoryURL.path],
-                                                 [self shellQuotedString:sourceURL.path],
+                                                 [self shellQuotedString:stagedSourceURL.path],
                                                  [self shellQuotedString:targetFileURL.path],
                                                  [self shellQuotedString:targetFileURL.path],
                                                  [self shellQuotedString:targetFileURL.path]];
@@ -1448,16 +1495,44 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   task.standardError = errorPipe;
 
   @try {
+    [[NSNotificationCenter defaultCenter] postNotificationName:RCTDisplayPrivilegedInstallWillBeginNotification
+                                                        object:self];
     [task launch];
     [task waitUntilExit];
   } @catch (NSException *exception) {
+    NSLog(@"[macDisplayBar] Display override privileged install exception: target=%@ reason=%@",
+          targetFileURL.path,
+          exception.reason ?: @"");
     if (errorMessage != nil) {
       *errorMessage = exception.reason ?: @"Privileged override install failed";
     }
+    [[NSNotificationCenter defaultCenter] postNotificationName:RCTDisplayPrivilegedInstallDidEndNotification
+                                                        object:self];
+    [fileManager removeItemAtURL:stagedDirectoryURL error:nil];
     return NO;
   }
 
+  [[NSNotificationCenter defaultCenter] postNotificationName:RCTDisplayPrivilegedInstallDidEndNotification
+                                                      object:self];
+
   if (task.terminationStatus == 0) {
+    BOOL targetMatches = [fileManager contentsEqualAtPath:stagedSourceURL.path andPath:targetFileURL.path];
+
+    if (!targetMatches) {
+      NSLog(@"[macDisplayBar] Display override privileged install verification failed: target=%@",
+            targetFileURL.path);
+
+      if (errorMessage != nil) {
+        *errorMessage = @"installed override contents do not match source";
+      }
+
+      [fileManager removeItemAtURL:stagedDirectoryURL error:nil];
+      return NO;
+    }
+
+    NSLog(@"[macDisplayBar] Display override privileged install verified: target=%@",
+          targetFileURL.path);
+    [fileManager removeItemAtURL:stagedDirectoryURL error:nil];
     return YES;
   }
 
@@ -1466,10 +1541,17 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
       [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
   NSString *fallbackError = directError.localizedDescription ?: @"Privileged override install failed";
 
+  NSLog(@"[macDisplayBar] Display override privileged install failed: status=%d target=%@ stderr=%@ directError=%@",
+        task.terminationStatus,
+        targetFileURL.path,
+        privilegedError ?: @"",
+        directError.localizedDescription ?: @"");
+
   if (errorMessage != nil) {
     *errorMessage = privilegedError.length > 0 ? privilegedError : fallbackError;
   }
 
+  [fileManager removeItemAtURL:stagedDirectoryURL error:nil];
   return NO;
 }
 
@@ -1488,6 +1570,8 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 {
   NSMutableArray<NSData *> *scaleResolutions = [NSMutableArray new];
   NSMutableSet<NSData *> *seenResolutions = [NSMutableSet new];
+  NSDictionary *hiDpiSeedResolution = nil;
+  NSUInteger hiDpiSeedArea = 0;
 
   for (NSDictionary *resolution in customResolutions) {
     NSUInteger width = [resolution[@"width"] unsignedIntegerValue];
@@ -1498,8 +1582,13 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     }
 
     if ([resolution[@"isHiDpi"] boolValue]) {
-      width *= 2;
-      height *= 2;
+      NSUInteger area = width * height;
+
+      if (hiDpiSeedResolution == nil || area > hiDpiSeedArea) {
+        hiDpiSeedResolution = resolution;
+        hiDpiSeedArea = area;
+      }
+      continue;
     }
 
     NSData *data = [self scaleResolutionDataWithWidth:width height:height];
@@ -1512,7 +1601,215 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     [scaleResolutions addObject:data];
   }
 
+  if (hiDpiSeedResolution != nil) {
+    [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
+                                              seen:seenResolutions
+                                             width:[hiDpiSeedResolution[@"width"] unsignedIntegerValue]
+                                            height:[hiDpiSeedResolution[@"height"] unsignedIntegerValue]];
+  }
+
   return scaleResolutions;
+}
+
+- (void)appendOneKeyHiDpiScaleResolutionsToArray:(NSMutableArray<NSData *> *)scaleResolutions
+                                            seen:(NSMutableSet<NSData *> *)seenResolutions
+                                           width:(NSUInteger)width
+                                          height:(NSUInteger)height
+{
+  NSArray<NSNumber *> *res1Ratios = @[
+    @1.0,
+    @1.25,
+    @(4.0 / 3.0),
+    @(16.0 / 11.0),
+    @(16.0 / 9.0),
+    @2.0,
+  ];
+  NSArray<NSNumber *> *res2Ratios = @[
+    @2.0,
+    @(8.0 / 3.0),
+  ];
+  NSArray<NSNumber *> *res3Ratios = @[
+    @(8.0 / 3.0),
+  ];
+  NSArray<NSNumber *> *res4Ratios = @[
+    @1.25,
+    @(4.0 / 3.0),
+    @(16.0 / 11.0),
+    @(16.0 / 9.0),
+    @2.0,
+    @(8.0 / 3.0),
+  ];
+
+  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
+                                            seen:seenResolutions
+                                           width:width
+                                          height:height
+                                          ratios:res1Ratios
+                                     suffixBytes:@[ @0x00 ]];
+  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
+                                            seen:seenResolutions
+                                           width:width
+                                          height:height
+                                          ratios:res2Ratios
+                                     suffixBytes:@[ @0x00, @0x00, @0x00, @0x01, @0x00, @0x20, @0x00, @0x00 ]];
+  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
+                                            seen:seenResolutions
+                                           width:width
+                                          height:height
+                                          ratios:res3Ratios
+                                     suffixBytes:@[ @0x00, @0x00, @0x00, @0x01 ]];
+  [self appendOneKeyHiDpiScaleResolutionsToArray:scaleResolutions
+                                            seen:seenResolutions
+                                           width:width
+                                          height:height
+                                          ratios:res4Ratios
+                                     suffixBytes:@[ @0x00, @0x00, @0x00, @0x09, @0x00, @0xa0, @0x00, @0x00 ]];
+}
+
+- (void)appendOneKeyHiDpiScaleResolutionsToArray:(NSMutableArray<NSData *> *)scaleResolutions
+                                            seen:(NSMutableSet<NSData *> *)seenResolutions
+                                           width:(NSUInteger)width
+                                          height:(NSUInteger)height
+                                          ratios:(NSArray<NSNumber *> *)ratios
+                                     suffixBytes:(NSArray<NSNumber *> *)suffixBytes
+{
+  for (NSNumber *ratioValue in ratios) {
+    double ratio = ratioValue.doubleValue;
+    NSUInteger logicalWidth = (NSUInteger)llround((double)width / ratio);
+    NSUInteger logicalHeight = (NSUInteger)llround((double)height / ratio);
+
+    if (logicalWidth == 0 || logicalHeight == 0) {
+      continue;
+    }
+
+    NSData *data = [self oneKeyHiDpiScaleResolutionDataWithLogicalWidth:logicalWidth
+                                                           logicalHeight:logicalHeight
+                                                             suffixBytes:suffixBytes];
+
+    if ([seenResolutions containsObject:data]) {
+      continue;
+    }
+
+    [seenResolutions addObject:data];
+    [scaleResolutions addObject:data];
+  }
+}
+
+- (NSSet<NSString *> *)generatedHiDpiRecipeResolutionKeysForWidth:(NSUInteger)width height:(NSUInteger)height
+{
+  NSMutableSet<NSString *> *resolutionKeys = [NSMutableSet new];
+  NSArray<NSNumber *> *ratios = @[
+    @1.0,
+    @1.25,
+    @(4.0 / 3.0),
+    @(16.0 / 11.0),
+    @(16.0 / 9.0),
+    @2.0,
+    @(8.0 / 3.0),
+  ];
+
+  for (NSNumber *ratioValue in ratios) {
+    double ratio = ratioValue.doubleValue;
+    NSUInteger logicalWidth = (NSUInteger)llround((double)width / ratio);
+    NSUInteger logicalHeight = (NSUInteger)llround((double)height / ratio);
+
+    if (logicalWidth == 0 || logicalHeight == 0) {
+      continue;
+    }
+
+    [resolutionKeys addObject:[self resolutionKeyForWidth:logicalWidth height:logicalHeight]];
+  }
+
+  return resolutionKeys;
+}
+
+- (BOOL)generatedHiDpiRecipeIsExposedInResolutionKeys:(NSSet<NSString *> *)hiDpiResolutionKeys
+                                                width:(NSUInteger)width
+                                               height:(NSUInteger)height
+{
+  for (NSString *resolutionKey in [self generatedHiDpiRecipeResolutionKeysForWidth:width height:height]) {
+    if ([hiDpiResolutionKeys containsObject:resolutionKey]) {
+      return YES;
+    }
+  }
+
+  return NO;
+}
+
+- (BOOL)exposedGeneratedHiDpiRecipeExistsForDisplayID:(CGDirectDisplayID)displayID
+                                                width:(NSUInteger)width
+                                               height:(NSUInteger)height
+{
+  NSDictionary *options = @{(__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes : @YES};
+  CFArrayRef copiedModes = CGDisplayCopyAllDisplayModes(displayID, (__bridge CFDictionaryRef)options);
+
+  if (copiedModes == NULL) {
+    return NO;
+  }
+
+  NSArray *modes = CFBridgingRelease(copiedModes);
+  NSMutableSet<NSString *> *hiDpiResolutionKeys = [NSMutableSet new];
+
+  for (id item in modes) {
+    CGDisplayModeRef candidate = (__bridge CGDisplayModeRef)item;
+
+    if (CGDisplayModeGetPixelWidth(candidate) <= CGDisplayModeGetWidth(candidate)) {
+      continue;
+    }
+
+    [hiDpiResolutionKeys addObject:[self resolutionKeyForWidth:CGDisplayModeGetWidth(candidate)
+                                                        height:CGDisplayModeGetHeight(candidate)]];
+  }
+
+  return [self generatedHiDpiRecipeIsExposedInResolutionKeys:hiDpiResolutionKeys width:width height:height];
+}
+
+- (BOOL)installedOneKeyHiDpiRecipeExistsForDisplayID:(CGDirectDisplayID)displayID
+                                               width:(NSUInteger)width
+                                              height:(NSUInteger)height
+{
+  NSString *vendorDirectoryName = [NSString stringWithFormat:@"DisplayVendorID-%x", CGDisplayVendorNumber(displayID)];
+  NSString *productFileName = [NSString stringWithFormat:@"DisplayProductID-%x", CGDisplayModelNumber(displayID)];
+  NSURL *overrideURL = [[[NSURL fileURLWithPath:RCTDisplayOverrideInstallDirectory isDirectory:YES]
+      URLByAppendingPathComponent:vendorDirectoryName
+                      isDirectory:YES] URLByAppendingPathComponent:productFileName];
+  NSData *plistData = [NSData dataWithContentsOfURL:overrideURL];
+
+  if (plistData.length == 0) {
+    return NO;
+  }
+
+  NSError *error = nil;
+  NSDictionary *manifest = [NSPropertyListSerialization propertyListWithData:plistData
+                                                                     options:NSPropertyListImmutable
+                                                                      format:nil
+                                                                       error:&error];
+
+  if (![manifest isKindOfClass:NSDictionary.class] || error != nil) {
+    return NO;
+  }
+
+  NSArray *installedScaleResolutions = manifest[@"scale-resolutions"];
+
+  if (![installedScaleResolutions isKindOfClass:NSArray.class]) {
+    return NO;
+  }
+
+  NSMutableArray<NSData *> *expectedScaleResolutions = [NSMutableArray new];
+  NSMutableSet<NSData *> *expectedSet = [NSMutableSet new];
+  [self appendOneKeyHiDpiScaleResolutionsToArray:expectedScaleResolutions
+                                            seen:expectedSet
+                                           width:width
+                                          height:height];
+  NSSet *installedSet = [NSSet setWithArray:installedScaleResolutions];
+
+  for (NSData *expectedResolution in expectedScaleResolutions) {
+    if (![installedSet containsObject:expectedResolution]) {
+      return NO;
+    }
+  }
+
+  return YES;
 }
 
 - (NSData *)scaleResolutionDataWithWidth:(NSUInteger)width height:(NSUInteger)height
@@ -1523,6 +1820,24 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   };
 
   return [NSData dataWithBytes:encodedResolution length:sizeof(encodedResolution)];
+}
+
+- (NSData *)oneKeyHiDpiScaleResolutionDataWithLogicalWidth:(NSUInteger)logicalWidth
+                                             logicalHeight:(NSUInteger)logicalHeight
+                                               suffixBytes:(NSArray<NSNumber *> *)suffixBytes
+{
+  uint32_t encodedResolution[2] = {
+    htonl((uint32_t)MIN(logicalWidth * 2, UINT32_MAX)),
+    htonl((uint32_t)MIN(logicalHeight * 2, UINT32_MAX)),
+  };
+  NSMutableData *data = [NSMutableData dataWithBytes:encodedResolution length:sizeof(encodedResolution)];
+
+  for (NSNumber *suffixByte in suffixBytes) {
+    uint8_t byte = (uint8_t)suffixByte.unsignedCharValue;
+    [data appendBytes:&byte length:sizeof(byte)];
+  }
+
+  return data;
 }
 
 - (double)normalizedRotation:(double)rotation
@@ -1557,6 +1872,7 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   NSMutableArray<NSDictionary *> *modeDictionaries = [NSMutableArray arrayWithCapacity:modes.count];
   NSMutableSet<NSString *> *seenModeIDs = [NSMutableSet new];
   NSMutableSet<NSString *> *seenHiDpiResolutionKeys = [NSMutableSet new];
+  NSMutableSet<NSString *> *seenHiDpiRefreshKeys = [NSMutableSet new];
   NSMutableDictionary<NSString *, NSDictionary *> *bestStandardModeByResolution = [NSMutableDictionary new];
   NSString *displayIDString = [NSString stringWithFormat:@"%u", displayID];
 
@@ -1578,6 +1894,9 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
     if ([modeDictionary[@"isHiDpi"] boolValue]) {
       [seenHiDpiResolutionKeys addObject:resolutionKey];
+      [seenHiDpiRefreshKeys addObject:[self resolutionRefreshKeyForWidth:[modeDictionary[@"width"] unsignedIntegerValue]
+                                                                   height:[modeDictionary[@"height"] unsignedIntegerValue]
+                                                              refreshRate:[modeDictionary[@"refreshRate"] doubleValue]]];
       continue;
     }
 
@@ -1588,18 +1907,51 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     }
   }
 
-  for (NSString *resolutionKey in bestStandardModeByResolution) {
-    if ([seenHiDpiResolutionKeys containsObject:resolutionKey]) {
-      continue;
-    }
+  NSUInteger generatedHiDpiRowsAdded = 0;
+  NSUInteger generatedHiDpiRowsSkippedExact = 0;
+  NSUInteger generatedHiDpiRowsSkippedRecipe = 0;
+  NSUInteger generatedHiDpiRowsSkippedDuplicate = 0;
+  NSUInteger generatedHiDpiRowsSkippedNonSeed = 0;
+  NSUInteger seedArea = 0;
 
+  for (NSDictionary *mode in bestStandardModeByResolution.allValues) {
+    NSUInteger width = [mode[@"width"] unsignedIntegerValue];
+    NSUInteger height = [mode[@"height"] unsignedIntegerValue];
+    seedArea = MAX(seedArea, width * height);
+  }
+
+  for (NSString *resolutionKey in bestStandardModeByResolution) {
     NSDictionary *mode = bestStandardModeByResolution[resolutionKey];
     NSUInteger width = [mode[@"width"] unsignedIntegerValue];
     NSUInteger height = [mode[@"height"] unsignedIntegerValue];
     double refreshRate = [mode[@"refreshRate"] doubleValue];
     NSString *modeID = [self generatedHiDpiModeIDWithWidth:width height:height refreshRate:refreshRate];
+    BOOL recipeIsExposed = [self generatedHiDpiRecipeIsExposedInResolutionKeys:seenHiDpiResolutionKeys
+                                                                         width:width
+                                                                        height:height];
+    BOOL installedOneKeyRecipe = [self installedOneKeyHiDpiRecipeExistsForDisplayID:displayID
+                                                                              width:width
+                                                                             height:height];
+
+    if (width * height < seedArea) {
+      generatedHiDpiRowsSkippedNonSeed++;
+      continue;
+    }
+
+    if ([seenHiDpiRefreshKeys containsObject:[self resolutionRefreshKeyForWidth:width
+                                                                         height:height
+                                                                    refreshRate:refreshRate]]) {
+      generatedHiDpiRowsSkippedExact++;
+      continue;
+    }
+
+    if (recipeIsExposed && installedOneKeyRecipe) {
+      generatedHiDpiRowsSkippedRecipe++;
+      continue;
+    }
 
     if ([seenModeIDs containsObject:modeID]) {
+      generatedHiDpiRowsSkippedDuplicate++;
       continue;
     }
 
@@ -1614,7 +1966,20 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
       @"isFavorite" : @([self modeIDIsFavorite:modeID displayIDString:displayIDString]),
       @"requiresOverride" : @YES,
     }];
+    generatedHiDpiRowsAdded++;
   }
+
+  NSLog(@"[macDisplayBar] Generated HiDPI install row summary: displayID=%@ standardResolutionCount=%lu hiDpiResolutionCount=%lu seedArea=%lu added=%lu skippedExact=%lu skippedRecipe=%lu skippedNonSeed=%lu skippedDuplicate=%lu totalModeCount=%lu",
+        displayIDString,
+        (unsigned long)bestStandardModeByResolution.count,
+        (unsigned long)seenHiDpiResolutionKeys.count,
+        (unsigned long)seedArea,
+        (unsigned long)generatedHiDpiRowsAdded,
+        (unsigned long)generatedHiDpiRowsSkippedExact,
+        (unsigned long)generatedHiDpiRowsSkippedRecipe,
+        (unsigned long)generatedHiDpiRowsSkippedNonSeed,
+        (unsigned long)generatedHiDpiRowsSkippedDuplicate,
+        (unsigned long)modeDictionaries.count);
 
   [modeDictionaries sortUsingComparator:^NSComparisonResult(NSDictionary *left, NSDictionary *right) {
     NSNumber *leftFavorite = left[@"isFavorite"];
@@ -1694,6 +2059,11 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   return [NSString stringWithFormat:@"%lu:%lu", (unsigned long)width, (unsigned long)height];
 }
 
+- (NSString *)resolutionRefreshKeyForWidth:(NSUInteger)width height:(NSUInteger)height refreshRate:(double)refreshRate
+{
+  return [NSString stringWithFormat:@"%lu:%lu:%.3f", (unsigned long)width, (unsigned long)height, refreshRate];
+}
+
 - (NSString *)generatedHiDpiModeIDWithWidth:(NSUInteger)width height:(NSUInteger)height refreshRate:(double)refreshRate
 {
   return [NSString stringWithFormat:@"%@:%lu:%lu:%.3f",
@@ -1736,6 +2106,59 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     NSUInteger width = [generatedHiDpiMode[@"width"] unsignedIntegerValue];
     NSUInteger height = [generatedHiDpiMode[@"height"] unsignedIntegerValue];
     double refreshRate = [generatedHiDpiMode[@"refreshRate"] doubleValue];
+    CGError applyError = kCGErrorSuccess;
+
+    NSLog(@"[macDisplayBar] Generated HiDPI install/apply start: displayID=%@ modeID=%@ width=%lu height=%lu refreshRate=%.3f",
+          displayIDString,
+          modeID,
+          (unsigned long)width,
+          (unsigned long)height,
+          refreshRate);
+
+    BOOL didApplyMode = [self applyAvailableHiDpiModeForDisplayID:displayID
+                                                             width:width
+                                                            height:height
+                                                       refreshRate:refreshRate
+                                                             error:&applyError];
+
+    if (didApplyMode) {
+      self.modeStatus[displayIDString] = @"Applied";
+      [self.modeErrors removeObjectForKey:displayIDString];
+      NSLog(@"[macDisplayBar] Generated HiDPI exact mode applied: displayID=%@ modeID=%@ width=%lu height=%lu refreshRate=%.3f",
+            displayIDString,
+            modeID,
+            (unsigned long)width,
+            (unsigned long)height,
+            refreshRate);
+      return YES;
+    }
+
+    BOOL recipeIsExposed = [self exposedGeneratedHiDpiRecipeExistsForDisplayID:displayID width:width height:height];
+    BOOL installedOneKeyRecipe = [self installedOneKeyHiDpiRecipeExistsForDisplayID:displayID width:width height:height];
+
+    if (recipeIsExposed && installedOneKeyRecipe) {
+      self.modeStatus[displayIDString] = @"HiDPI settings installed";
+      [self.modeErrors removeObjectForKey:displayIDString];
+      NSLog(@"[macDisplayBar] Generated HiDPI one-key recipe already installed and exposed; exact requested refresh is not exposed by macOS: displayID=%@ modeID=%@ width=%lu height=%lu refreshRate=%.3f applyError=%d",
+            displayIDString,
+            modeID,
+            (unsigned long)width,
+            (unsigned long)height,
+            refreshRate,
+            applyError);
+      return YES;
+    }
+
+    if (recipeIsExposed && !installedOneKeyRecipe) {
+      NSLog(@"[macDisplayBar] Generated HiDPI recipe is exposed but installed override is not one-key complete; rewriting recipe: displayID=%@ modeID=%@ width=%lu height=%lu refreshRate=%.3f applyError=%d",
+            displayIDString,
+            modeID,
+            (unsigned long)width,
+            (unsigned long)height,
+            refreshRate,
+            applyError);
+    }
+
     [self saveCustomResolutionIfNeededForDisplayID:displayIDString
                                              width:width
                                             height:height
@@ -1744,16 +2167,21 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     NSString *bundlePath = [self writeOverrideBundleForDisplayIDString:displayIDString];
     NSString *installError = nil;
     BOOL didInstallBundle = NO;
-    CGError applyError = kCGErrorSuccess;
-    BOOL didApplyMode = [self applyAvailableHiDpiModeForDisplayID:displayID
-                                                             width:width
-                                                            height:height
-                                                       refreshRate:refreshRate
-                                                             error:&applyError];
+
+    NSLog(@"[macDisplayBar] Generated HiDPI override bundle prepared: displayID=%@ modeID=%@ bundlePath=%@ customResolutionCount=%lu",
+          displayIDString,
+          modeID,
+          bundlePath.length > 0 ? bundlePath : @"",
+          (unsigned long)(self.customResolutionRequests[displayIDString] ?: @[]).count);
 
     if (bundlePath.length > 0) {
       self.overrideBundlePaths[displayIDString] = bundlePath;
       didInstallBundle = [self installOverrideBundleAtPath:bundlePath errorMessage:&installError];
+      NSLog(@"[macDisplayBar] Generated HiDPI override install result: displayID=%@ modeID=%@ didInstall=%@ error=%@",
+            displayIDString,
+            modeID,
+            didInstallBundle ? @"YES" : @"NO",
+            installError ?: @"");
       self.overrideBundleStatus[displayIDString] = didInstallBundle ? @"Installed" : @"Install failed";
       [[NSUserDefaults standardUserDefaults] setObject:self.overrideBundlePaths
                                                 forKey:RCTDisplayOverrideBundlePathsDefaultsKey];
@@ -1769,6 +2197,10 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
             [NSThread sleepForTimeInterval:0.25];
           }
 
+          NSLog(@"[macDisplayBar] Generated HiDPI exact apply retry: displayID=%@ modeID=%@ attempt=%lu",
+                displayIDString,
+                modeID,
+                (unsigned long)(attempt + 1));
           didApplyMode = [self applyAvailableHiDpiModeForDisplayID:displayID
                                                              width:width
                                                             height:height
@@ -1781,12 +2213,29 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     if (didApplyMode) {
       self.modeStatus[displayIDString] = @"Applied";
       [self.modeErrors removeObjectForKey:displayIDString];
+      NSLog(@"[macDisplayBar] Generated HiDPI exact mode applied after install: displayID=%@ modeID=%@ width=%lu height=%lu refreshRate=%.3f",
+            displayIDString,
+            modeID,
+            (unsigned long)width,
+            (unsigned long)height,
+            refreshRate);
       return YES;
     }
 
     if (didInstallBundle) {
       self.modeStatus[displayIDString] = @"HiDPI settings installed";
       [self.modeErrors removeObjectForKey:displayIDString];
+      BOOL recipeExposedAfterInstall = [self exposedGeneratedHiDpiRecipeExistsForDisplayID:displayID
+                                                                                    width:width
+                                                                                   height:height];
+      NSLog(@"[macDisplayBar] Generated HiDPI install completed without exact requested refresh: displayID=%@ modeID=%@ width=%lu height=%lu refreshRate=%.3f recipeExposed=%@ applyError=%d",
+            displayIDString,
+            modeID,
+            (unsigned long)width,
+            (unsigned long)height,
+            refreshRate,
+            recipeExposedAfterInstall ? @"YES" : @"NO",
+            applyError);
       return YES;
     }
 
@@ -1854,17 +2303,42 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
   NSArray *modes = CFBridgingRelease(copiedModes);
   CGDisplayModeRef hiDpiMode = NULL;
+  NSUInteger sameSizeCount = 0;
+  NSUInteger sameSizeSameRefreshCount = 0;
+  NSUInteger sameSizeHiDpiCount = 0;
+  NSMutableArray<NSString *> *sameSizeModeDescriptions = [NSMutableArray new];
 
   for (id item in modes) {
     CGDisplayModeRef candidate = (__bridge CGDisplayModeRef)item;
     BOOL sameSize = CGDisplayModeGetWidth(candidate) == width && CGDisplayModeGetHeight(candidate) == height;
     BOOL sameRefresh = refreshRate <= 0 || fabs(CGDisplayModeGetRefreshRate(candidate) - refreshRate) < 0.5;
+    BOOL isHiDpi = CGDisplayModeGetPixelWidth(candidate) > CGDisplayModeGetWidth(candidate);
+
+    if (sameSize) {
+      sameSizeCount++;
+
+      if (sameRefresh) {
+        sameSizeSameRefreshCount++;
+      }
+
+      if (isHiDpi) {
+        sameSizeHiDpiCount++;
+      }
+
+      if (sameSizeModeDescriptions.count < 8) {
+        [sameSizeModeDescriptions addObject:[NSString stringWithFormat:@"%zux%zu->%zux%zu@%.3f %@",
+                                             CGDisplayModeGetWidth(candidate),
+                                             CGDisplayModeGetHeight(candidate),
+                                             CGDisplayModeGetPixelWidth(candidate),
+                                             CGDisplayModeGetPixelHeight(candidate),
+                                             CGDisplayModeGetRefreshRate(candidate),
+                                             isHiDpi ? @"HiDPI" : @"1x"]];
+      }
+    }
 
     if (!sameSize || !sameRefresh) {
       continue;
     }
-
-    BOOL isHiDpi = CGDisplayModeGetPixelWidth(candidate) > CGDisplayModeGetWidth(candidate);
 
     if (isHiDpi) {
       hiDpiMode = candidate;
@@ -1873,6 +2347,16 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   }
 
   if (hiDpiMode == NULL) {
+    NSLog(@"[macDisplayBar] Generated HiDPI exact mode not found: displayID=%u width=%lu height=%lu refreshRate=%.3f modeCount=%lu sameSize=%lu sameSizeSameRefresh=%lu sameSizeHiDPI=%lu sameSizeModes=%@",
+          displayID,
+          (unsigned long)width,
+          (unsigned long)height,
+          refreshRate,
+          (unsigned long)modes.count,
+          (unsigned long)sameSizeCount,
+          (unsigned long)sameSizeSameRefreshCount,
+          (unsigned long)sameSizeHiDpiCount,
+          [sameSizeModeDescriptions componentsJoinedByString:@" | "]);
     if (error != NULL) {
       *error = kCGErrorIllegalArgument;
     }

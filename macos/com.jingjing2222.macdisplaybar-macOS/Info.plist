@@ -25,7 +25,7 @@
 		<key>HOT_UPDATER_CHANNEL</key>
 		<string>production</string>
 		<key>HOT_UPDATER_FINGERPRINT_HASH</key>
-		<string>eb9460eae10f7b5c983971efe59537f205df3d0a</string>
+		<string>31696173000b613752af09a43ccdf10c0090b358</string>
 		<key>LSMinimumSystemVersion</key>
 		<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 		<key>LSUIElement</key>

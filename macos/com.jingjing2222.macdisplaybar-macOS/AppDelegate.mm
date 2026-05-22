@@ -4,12 +4,18 @@
 #import <React/RCTBundleURLProvider.h>
 #import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
 
+static NSString *const RCTDisplayPrivilegedInstallWillBeginNotification =
+    @"RCTDisplayPrivilegedInstallWillBeginNotification";
+static NSString *const RCTDisplayPrivilegedInstallDidEndNotification =
+    @"RCTDisplayPrivilegedInstallDidEndNotification";
+
 @interface AppDelegate () <NSPopoverDelegate>
 
 @property (nonatomic, strong) NSStatusItem *statusItem;
 @property (nonatomic, strong) NSPopover *statusPopover;
 @property (nonatomic, strong) NSWindow *reactHostWindow;
 @property (nonatomic, strong) id outsideClickMonitor;
+@property (nonatomic, assign) NSInteger privilegedPromptDepth;
 
 @end
 
@@ -25,7 +31,24 @@
 
   [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
   [super applicationDidFinishLaunching:notification];
+  [self configureMainMenu];
   [self configureMenuBarShell];
+}
+
+- (void)configureMainMenu
+{
+  NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@"Main Menu"];
+  NSMenuItem *appMenuItem = [NSMenuItem new];
+  NSMenu *appMenu = [[NSMenu alloc] initWithTitle:@"macDisplayBar"];
+  NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit macDisplayBar"
+                                                   action:@selector(quitApplication:)
+                                            keyEquivalent:@"q"];
+
+  quitItem.target = self;
+  [appMenu addItem:quitItem];
+  appMenuItem.submenu = appMenu;
+  [mainMenu addItem:appMenuItem];
+  NSApp.mainMenu = mainMenu;
 }
 
 - (void)configureMenuBarShell
@@ -47,6 +70,14 @@
                                            selector:@selector(handleScreenParametersChanged:)
                                                name:NSApplicationDidChangeScreenParametersNotification
                                              object:NSApp];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(privilegedInstallWillBegin:)
+                                               name:RCTDisplayPrivilegedInstallWillBeginNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(privilegedInstallDidEnd:)
+                                               name:RCTDisplayPrivilegedInstallDidEndNotification
+                                             object:nil];
 
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:28.0];
   NSStatusBarButton *button = self.statusItem.button;
@@ -88,6 +119,10 @@
 
 - (void)closeStatusPopover:(id)sender
 {
+  if ([self shouldKeepStatusPopoverOpenForPrivilegedPrompt]) {
+    return;
+  }
+
   if (self.statusPopover.shown) {
     [self.statusPopover performClose:sender];
   }
@@ -107,6 +142,11 @@
                                   ofView:button
                            preferredEdge:NSRectEdgeMinY];
   [self installOutsideClickMonitor];
+}
+
+- (BOOL)shouldKeepStatusPopoverOpenForPrivilegedPrompt
+{
+  return self.privilegedPromptDepth > 0 && self.statusPopover.shown;
 }
 
 - (void)handleScreenParametersChanged:(NSNotification *)notification
@@ -146,6 +186,10 @@
       [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown
                                              handler:^(NSEvent *event) {
                                                dispatch_async(dispatch_get_main_queue(), ^{
+                                                 if ([weakSelf shouldKeepStatusPopoverOpenForPrivilegedPrompt]) {
+                                                   return;
+                                                 }
+
                                                  [weakSelf closeStatusPopover:event];
                                                });
                                              }];
@@ -164,6 +208,25 @@
 - (void)popoverDidClose:(NSNotification *)notification
 {
   [self uninstallOutsideClickMonitor];
+}
+
+- (void)privilegedInstallWillBegin:(NSNotification *)notification
+{
+  dispatch_async(dispatch_get_main_queue(), ^{
+    self.privilegedPromptDepth += 1;
+    self.statusPopover.behavior = NSPopoverBehaviorApplicationDefined;
+  });
+}
+
+- (void)privilegedInstallDidEnd:(NSNotification *)notification
+{
+  dispatch_async(dispatch_get_main_queue(), ^{
+    self.privilegedPromptDepth = MAX(self.privilegedPromptDepth - 1, 0);
+
+    if (self.privilegedPromptDepth == 0) {
+      self.statusPopover.behavior = NSPopoverBehaviorTransient;
+    }
+  });
 }
 
 - (NSMenu *)statusContextMenu
