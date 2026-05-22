@@ -38,6 +38,8 @@ static NSString *const RCTDisplayOverrideBundlePathsDefaultsKey = @"displayOverr
 static NSString *const RCTDisplayOverrideBundleStatusDefaultsKey = @"displayOverrideBundleStatus";
 static NSString *const RCTDisplaySettingsDefaultsKey = @"displaySettings";
 static NSString *const RCTGeneratedHiDpiModeIDPrefix = @"generated-hidpi";
+static NSString *const RCTDisplayOverrideInstallDirectory =
+    @"/Library/Displays/Contents/Resources/Overrides";
 static const uint8_t RCTDdcDestinationAddress = 0x6E;
 static const uint8_t RCTDdcReplyAddress = 0x6F;
 static const uint8_t RCTDdcHostAddress = 0x51;
@@ -1363,7 +1365,7 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
     @"DisplaySerialNumber" : @(serialNumber),
     @"GeneratedAt" : [formatter stringFromDate:[NSDate date]],
     @"TargetInstallDirectory" :
-        @"/Library/Displays/Contents/Resources/Overrides",
+        RCTDisplayOverrideInstallDirectory,
     @"RequiresPrivilegedInstall" : @YES,
     @"CustomResolutions" : customResolutions,
     @"EdidOverrideSourcePath" : self.edidOverridePaths[displayID] ?: @"",
@@ -1394,6 +1396,92 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
 
   BOOL didWrite = [plistData writeToURL:fileURL atomically:YES];
   return didWrite ? fileURL.path : @"";
+}
+
+- (BOOL)installOverrideBundleAtPath:(NSString *)bundlePath errorMessage:(NSString **)errorMessage
+{
+  NSURL *sourceURL = [NSURL fileURLWithPath:bundlePath];
+  NSString *vendorDirectoryName = sourceURL.URLByDeletingLastPathComponent.lastPathComponent;
+  NSString *productFileName = sourceURL.lastPathComponent;
+
+  if (vendorDirectoryName.length == 0 || productFileName.length == 0) {
+    if (errorMessage != nil) {
+      *errorMessage = @"Display override bundle path invalid";
+    }
+    return NO;
+  }
+
+  NSURL *targetDirectoryURL =
+      [[NSURL fileURLWithPath:RCTDisplayOverrideInstallDirectory isDirectory:YES]
+          URLByAppendingPathComponent:vendorDirectoryName
+                          isDirectory:YES];
+  NSURL *targetFileURL = [targetDirectoryURL URLByAppendingPathComponent:productFileName];
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  NSError *directError = nil;
+
+  [fileManager createDirectoryAtURL:targetDirectoryURL
+        withIntermediateDirectories:YES
+                         attributes:nil
+                              error:&directError];
+
+  if (directError == nil) {
+    [fileManager removeItemAtURL:targetFileURL error:nil];
+
+    if ([fileManager copyItemAtURL:sourceURL toURL:targetFileURL error:&directError]) {
+      return YES;
+    }
+  }
+
+  NSString *command = [NSString stringWithFormat:@"/bin/mkdir -p %@ && /bin/cp -f %@ %@ && /usr/sbin/chown root:wheel %@ && /bin/chmod 644 %@",
+                                                 [self shellQuotedString:targetDirectoryURL.path],
+                                                 [self shellQuotedString:sourceURL.path],
+                                                 [self shellQuotedString:targetFileURL.path],
+                                                 [self shellQuotedString:targetFileURL.path],
+                                                 [self shellQuotedString:targetFileURL.path]];
+  NSString *script = [NSString stringWithFormat:@"do shell script \"%@\" with administrator privileges",
+                                                [self appleScriptQuotedString:command]];
+  NSTask *task = [NSTask new];
+  NSPipe *errorPipe = [NSPipe pipe];
+
+  task.launchPath = @"/usr/bin/osascript";
+  task.arguments = @[ @"-e", script ];
+  task.standardError = errorPipe;
+
+  @try {
+    [task launch];
+    [task waitUntilExit];
+  } @catch (NSException *exception) {
+    if (errorMessage != nil) {
+      *errorMessage = exception.reason ?: @"Privileged override install failed";
+    }
+    return NO;
+  }
+
+  if (task.terminationStatus == 0) {
+    return YES;
+  }
+
+  NSData *errorData = [errorPipe.fileHandleForReading readDataToEndOfFile];
+  NSString *privilegedError =
+      [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
+  NSString *fallbackError = directError.localizedDescription ?: @"Privileged override install failed";
+
+  if (errorMessage != nil) {
+    *errorMessage = privilegedError.length > 0 ? privilegedError : fallbackError;
+  }
+
+  return NO;
+}
+
+- (NSString *)shellQuotedString:(NSString *)value
+{
+  return [NSString stringWithFormat:@"'%@'", [value stringByReplacingOccurrencesOfString:@"'" withString:@"'\\''"]];
+}
+
+- (NSString *)appleScriptQuotedString:(NSString *)value
+{
+  NSString *escapedValue = [value stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+  return [escapedValue stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
 }
 
 - (NSArray<NSData *> *)scaleResolutionsForCustomResolutions:(NSArray<NSDictionary *> *)customResolutions
@@ -1645,28 +1733,58 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   NSDictionary *generatedHiDpiMode = [self generatedHiDpiModeComponentsFromModeID:modeID];
 
   if (generatedHiDpiMode != nil) {
+    NSUInteger width = [generatedHiDpiMode[@"width"] unsignedIntegerValue];
+    NSUInteger height = [generatedHiDpiMode[@"height"] unsignedIntegerValue];
+    double refreshRate = [generatedHiDpiMode[@"refreshRate"] doubleValue];
     [self saveCustomResolutionIfNeededForDisplayID:displayIDString
-                                             width:[generatedHiDpiMode[@"width"] doubleValue]
-                                            height:[generatedHiDpiMode[@"height"] doubleValue]
-                                       refreshRate:[generatedHiDpiMode[@"refreshRate"] doubleValue]
+                                             width:width
+                                            height:height
+                                       refreshRate:refreshRate
                                            isHiDpi:YES];
     NSString *bundlePath = [self writeOverrideBundleForDisplayIDString:displayIDString];
+    NSString *installError = nil;
+    BOOL didInstallBundle = NO;
+    CGError applyError = kCGErrorSuccess;
+    BOOL didApplyMode = [self applyAvailableHiDpiModeForDisplayID:displayID
+                                                             width:width
+                                                            height:height
+                                                       refreshRate:refreshRate
+                                                             error:&applyError];
 
     if (bundlePath.length > 0) {
       self.overrideBundlePaths[displayIDString] = bundlePath;
-      self.overrideBundleStatus[displayIDString] = @"Bundle written";
-      self.modeStatus[displayIDString] = @"HiDPI settings file created";
-      self.modeErrors[displayIDString] = bundlePath;
+      didInstallBundle = [self installOverrideBundleAtPath:bundlePath errorMessage:&installError];
+      self.overrideBundleStatus[displayIDString] = didInstallBundle ? @"Installed" : @"Install failed";
       [[NSUserDefaults standardUserDefaults] setObject:self.overrideBundlePaths
                                                 forKey:RCTDisplayOverrideBundlePathsDefaultsKey];
       [[NSUserDefaults standardUserDefaults] setObject:self.overrideBundleStatus
                                                 forKey:RCTDisplayOverrideBundleStatusDefaultsKey];
-      [self recordAdvancedOperation:@"Generated HiDPI settings file written" displayID:displayIDString];
+      [self recordAdvancedOperation:didInstallBundle ? @"Generated HiDPI settings installed"
+                                                     : @"Generated HiDPI settings install failed"
+                         displayID:displayIDString];
+    }
+
+    if (didApplyMode) {
+      self.modeStatus[displayIDString] = @"Applied";
+      [self.modeErrors removeObjectForKey:displayIDString];
       return YES;
     }
 
+    if (didInstallBundle) {
+      self.modeStatus[displayIDString] = @"HiDPI settings installed";
+      [self.modeErrors removeObjectForKey:displayIDString];
+      return YES;
+    }
+
+    if (bundlePath.length > 0) {
+      self.modeStatus[displayIDString] = @"Failed";
+      self.modeErrors[displayIDString] = installError ?: @"HiDPI settings install failed";
+      return NO;
+    }
+
     self.modeStatus[displayIDString] = @"Failed";
-    self.modeErrors[displayIDString] = @"HiDPI settings file write failed";
+    self.modeErrors[displayIDString] =
+        [NSString stringWithFormat:@"HiDPI mode apply failed: %d", applyError];
     return NO;
   }
 
@@ -1702,6 +1820,62 @@ static void RCTDisplayReconfigurationCallback(CGDirectDisplayID displayID,
   self.modeStatus[displayIDString] = @"Not found";
   self.modeErrors[displayIDString] = @"Requested mode not available";
   return NO;
+}
+
+- (BOOL)applyAvailableHiDpiModeForDisplayID:(CGDirectDisplayID)displayID
+                                       width:(NSUInteger)width
+                                      height:(NSUInteger)height
+                                 refreshRate:(double)refreshRate
+                                       error:(CGError *)error
+{
+  NSDictionary *options = @{(__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes : @YES};
+  CFArrayRef copiedModes = CGDisplayCopyAllDisplayModes(displayID, (__bridge CFDictionaryRef)options);
+
+  if (copiedModes == NULL) {
+    if (error != NULL) {
+      *error = kCGErrorFailure;
+    }
+    return NO;
+  }
+
+  NSArray *modes = CFBridgingRelease(copiedModes);
+  CGDisplayModeRef hiDpiMode = NULL;
+
+  for (id item in modes) {
+    CGDisplayModeRef candidate = (__bridge CGDisplayModeRef)item;
+    BOOL sameSize = CGDisplayModeGetWidth(candidate) == width && CGDisplayModeGetHeight(candidate) == height;
+    BOOL sameRefresh = refreshRate <= 0 || fabs(CGDisplayModeGetRefreshRate(candidate) - refreshRate) < 0.5;
+
+    if (!sameSize || !sameRefresh) {
+      continue;
+    }
+
+    BOOL isHiDpi = CGDisplayModeGetPixelWidth(candidate) > CGDisplayModeGetWidth(candidate);
+
+    if (isHiDpi) {
+      hiDpiMode = candidate;
+      break;
+    }
+  }
+
+  if (hiDpiMode == NULL) {
+    if (error != NULL) {
+      *error = kCGErrorIllegalArgument;
+    }
+    return NO;
+  }
+
+  CGError result = CGDisplaySetDisplayMode(displayID, hiDpiMode, NULL);
+
+  if (error != NULL) {
+    *error = result;
+  }
+
+  if (result != kCGErrorSuccess) {
+    return NO;
+  }
+
+  return YES;
 }
 
 - (void)applyDisplayOriginForDisplayID:(CGDirectDisplayID)displayID x:(int32_t)x y:(int32_t)y

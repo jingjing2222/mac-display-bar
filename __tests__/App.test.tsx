@@ -92,6 +92,15 @@ const nativeSnapshot = vi.hoisted(() => ({
           isCurrent: false,
           isFavorite: false,
         },
+        {
+          id: 'generated-hidpi:3440:1440:60.000',
+          width: 3440,
+          height: 1440,
+          refreshRate: 60,
+          isHiDpi: true,
+          isCurrent: false,
+          isFavorite: false,
+        },
       ],
       modeStatus: 'Ready',
       modeError: '',
@@ -494,6 +503,41 @@ test('reverts resolution with Enter submit capture', async () => {
   expect(NativeDisplayControl!.setDisplayMode).toHaveBeenCalledWith(
     '1',
     '3024x1964@120x2',
+  );
+});
+
+test('generated HiDPI mode installs without opening a guidance or revert flow', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const trigger = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Current mode'));
+
+  await ReactTestRenderer.act(async () => {
+    trigger!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const modeRow = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('3440 x 1440'));
+
+  await ReactTestRenderer.act(async () => {
+    modeRow!.props.onPress();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(NativeDisplayControl!.setDisplayMode).toHaveBeenCalledWith(
+    '1',
+    'generated-hidpi:3440:1440:60.000',
+  );
+  expect(normalizedText(renderer!.root)).not.toContain('HiDPI mode needs');
+  expect(normalizedText(renderer!.root)).not.toContain(
+    'Return to the previous resolution?',
   );
 });
 
