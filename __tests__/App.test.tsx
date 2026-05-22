@@ -3,9 +3,12 @@
  */
 
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { vi } from 'vitest';
+
+import { languageFromLocale } from '../src/i18n/useI18n';
+import NativeDisplayControl from '../specs/NativeDisplayControl';
 
 const nativeSnapshot = vi.hoisted(() => ({
   moduleStatus: 'ready',
@@ -153,6 +156,84 @@ const nativeSnapshot = vi.hoisted(() => ({
         ],
       },
     },
+    {
+      id: '2',
+      name: 'Studio Display',
+      connectionType: 'thunderbolt',
+      isPrimary: false,
+      isBuiltin: false,
+      isOnline: true,
+      isActive: true,
+      isAsleep: false,
+      isMirrored: false,
+      isHardwareMirrored: false,
+      mirrorsDisplayID: '',
+      identity: {
+        uuid: 'C8E8A6A8-2C78-49C5-B509-A3E73E4761BD',
+        vendorID: 1552,
+        modelID: 41033,
+        serialNumber: 5678,
+        productName: 'Studio Display',
+        transport: 'thunderbolt',
+      },
+      rotation: 0,
+      frame: { x: 1512, y: 0, width: 1600, height: 1000 },
+      currentMode: {
+        id: '2560x1440@60x2',
+        width: 2560,
+        height: 1440,
+        refreshRate: 60,
+        isHiDpi: true,
+        isCurrent: true,
+        isFavorite: false,
+      },
+      availableModes: [],
+      modeStatus: 'Ready',
+      modeError: '',
+      nativeBrightness: 0.5,
+      brightnessControl: 'native',
+      brightnessError: '',
+      softwareDimming: 0,
+      supportsBrightness: true,
+      supportsSoftwareDimming: true,
+      supportsDdc: false,
+      ddc: {
+        brightness: 50,
+        contrast: 50,
+        volume: 0,
+        inputSource: 0,
+        readStatus: 'Unavailable',
+        lastError: '',
+      },
+      supportsHdr: false,
+      hdr: {
+        isSupported: false,
+        isActive: false,
+        currentHeadroom: 1,
+        potentialHeadroom: 1,
+        referenceHeadroom: 1,
+        xdrPreset: 'Unavailable',
+      },
+      colorProfileStatus: 'Ready',
+      colorProfileError: '',
+      colorProfiles: [],
+      advanced: {
+        supportsEdidExport: true,
+        edidBytes: 128,
+        edidExportPath: '',
+        edidOverridePath: '',
+        edidOverrideStatus: 'No override',
+        overrideBundlePath: '',
+        overrideBundleStatus: 'No bundle',
+        rotationRequest: 0,
+        rotationStatus: 'Current',
+        softConnectionState: 'connected',
+        xdrUpscaleState: 'disabled',
+        lastOperation: '',
+        lastOperationAt: '',
+        customResolutions: [],
+      },
+    },
   ],
 }));
 
@@ -174,6 +255,7 @@ vi.mock('@hot-updater/react-native', () => ({
 
 vi.mock('../specs/NativeDisplayControl', () => {
   const nativeModule = {
+    getSystemLocale: vi.fn(() => 'en-US'),
     getSnapshot: vi.fn(() => nativeSnapshot),
     refreshSnapshot: vi.fn(() => nativeSnapshot),
     setNativeBrightness: vi.fn(() => nativeSnapshot),
@@ -214,6 +296,8 @@ vi.mock('../specs/NativeDisplayControl', () => {
 import App from '../App';
 
 beforeEach(() => {
+  vi.mocked(NativeDisplayControl!.getSystemLocale).mockReset();
+  vi.mocked(NativeDisplayControl!.getSystemLocale).mockReturnValue('en-US');
   hotUpdaterMocks.checkForUpdate.mockReset();
   hotUpdaterMocks.checkForUpdate.mockResolvedValue(null);
   hotUpdaterMocks.isUpdateDownloaded.mockReset();
@@ -222,6 +306,10 @@ beforeEach(() => {
   hotUpdaterMocks.reload.mockResolvedValue(undefined);
   hotUpdaterMocks.updateBundle.mockReset();
   hotUpdaterMocks.updateBundle.mockResolvedValue(true);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 test('renders correctly', async () => {
@@ -241,12 +329,12 @@ test('uses the fixed menu bar popover width', async () => {
 
   expect(scrollView.props.style).toEqual(
     expect.objectContaining({
-      width: 460,
+      width: 520,
     }),
   );
 });
 
-test('renders BetterDisplay phase-three controls from native snapshot', async () => {
+test('renders redesigned BetterDisplay-style controls from native snapshot', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
 
   await ReactTestRenderer.act(() => {
@@ -254,17 +342,82 @@ test('renders BetterDisplay phase-three controls from native snapshot', async ()
   });
 
   const renderedText = JSON.stringify(renderer!.toJSON());
+  expect(renderedText).toContain('macDisplayBar');
+  expect(renderedText).toContain('App update');
+  expect(renderedText).toContain('Check for updates');
   expect(renderedText).toContain('Color LCD');
-  expect(renderedText).toContain('Resolution and refresh');
-  expect(renderedText).toContain('Color and HDR');
-  expect(renderedText).toContain('DDC hardware');
-  expect(renderedText).toContain('Settings');
-  expect(renderedText).toContain('15s refresh');
-  expect(renderedText).toContain('HDMI1');
+  expect(renderedText).toContain('Display');
+  expect(renderedText).toContain('Quick controls');
+  expect(renderedText).toContain('Brightness');
+  expect(renderedText).toContain('Dimming');
+  expect(renderedText).toContain('Resolution');
+  expect(renderedText).not.toContain('DDC hardware');
+  expect(renderedText).not.toContain('EDID');
+  expect(renderedText).not.toContain('UUID');
+  expect(renderedText).not.toContain('moduleStatus');
+  expect(renderedText).not.toContain('Native module');
+});
+
+test('opens display dropdown and selects another display', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const trigger = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Color LCD'));
+
+  await ReactTestRenderer.act(() => {
+    trigger!.props.onPress();
+  });
+
+  const renderedText = JSON.stringify(renderer!.toJSON());
+  expect(renderedText).toContain('Studio Display');
+});
+
+test('advanced tab exposes low-level display operations only after selection', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const renderedText = JSON.stringify(renderer!.toJSON());
   expect(renderedText).toContain('Advanced');
-  expect(renderedText).toContain('Custom:');
-  expect(renderedText).toContain('Queue');
+  expect(renderedText).toContain('Display information');
+  expect(renderedText).toContain('Custom resolution');
+  expect(renderedText).toContain('Extra brightness');
+  expect(renderedText).toContain('UUID');
   expect(renderedText).toContain('Sync and layout');
+});
+
+test('maps system locale to supported app languages', () => {
+  expect(languageFromLocale('ko-KR')).toBe('ko');
+  expect(languageFromLocale('en-US')).toBe('en');
+});
+
+test('reads app language from native locale', async () => {
+  vi.mocked(NativeDisplayControl!.getSystemLocale).mockReturnValue('ko-KR');
+
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const renderedText = JSON.stringify(renderer!.toJSON());
+  expect(renderedText).toContain('앱 업데이트');
+  expect(renderedText).toContain('업데이트 확인');
 });
 
 test('checks and reloads a downloaded HotUpdater bundle', async () => {
@@ -286,7 +439,7 @@ test('checks and reloads a downloaded HotUpdater bundle', async () => {
   });
 
   const checkButton = renderer!.root.findByProps({
-    accessibilityLabel: 'Check for app update',
+    accessibilityLabel: 'Check for updates',
   });
 
   await ReactTestRenderer.act(async () => {
@@ -294,7 +447,7 @@ test('checks and reloads a downloaded HotUpdater bundle', async () => {
   });
 
   const reloadButton = renderer!.root.findByProps({
-    accessibilityLabel: 'Reload downloaded app update',
+    accessibilityLabel: 'Apply update',
   });
 
   expect(hotUpdaterMocks.checkForUpdate).toHaveBeenCalledTimes(1);
@@ -307,3 +460,9 @@ test('checks and reloads a downloaded HotUpdater bundle', async () => {
 
   expect(hotUpdaterMocks.reload).toHaveBeenCalledTimes(1);
 });
+
+function instanceText(node: ReactTestRenderer.ReactTestInstance): string {
+  return node.children
+    .map((child) => (typeof child === 'string' ? child : instanceText(child)))
+    .join(' ');
+}

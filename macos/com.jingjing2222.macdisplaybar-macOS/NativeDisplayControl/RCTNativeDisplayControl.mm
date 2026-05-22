@@ -27,6 +27,18 @@
   return std::make_shared<facebook::react::NativeDisplayControlSpecJSI>(params);
 }
 
+- (NSString *)getSystemLocale
+{
+  NSString *preferredLanguage = [NSLocale preferredLanguages].firstObject;
+
+  if (preferredLanguage.length > 0) {
+    return preferredLanguage;
+  }
+
+  NSString *currentLocale = [NSLocale currentLocale].localeIdentifier;
+  return currentLocale.length > 0 ? currentLocale : @"en-US";
+}
+
 - (NSDictionary *)getSnapshot
 {
   return [self.displayCore getSnapshot];

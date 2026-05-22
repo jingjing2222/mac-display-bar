@@ -1,0 +1,1004 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+import type {
+  DisplayControlColorProfile,
+  DisplayControlDisplay,
+} from '../../specs/NativeDisplayControl';
+import type { useDisplayControl } from '../hooks/display/useDisplayControl';
+import { useDisplayTabs } from '../hooks/display/useDisplayTabs';
+import type { TranslationKey } from '../i18n/strings';
+import { ControlSlider } from './ControlSlider';
+import { Icon, type IconName } from './Icon';
+import { modeLabel, ResolutionPicker } from './ResolutionPicker';
+import { SegmentedTabs } from './SegmentedTabs';
+
+const font = {
+  family: 'Inter',
+} as const;
+
+type DisplayControlState = ReturnType<typeof useDisplayControl>;
+type DisplayActions = DisplayControlState['actions'];
+
+export function DisplayControlPanel({
+  control,
+  display,
+  t,
+}: {
+  control: DisplayControlState;
+  display: DisplayControlDisplay | null;
+  t: (key: TranslationKey) => string;
+}) {
+  const { activeTab, setActiveTab, tabs } = useDisplayTabs();
+
+  if (!display) {
+    return null;
+  }
+
+  return (
+    <View>
+      <View style={styles.sectionTitleRow}>
+        <Icon color="#2b89ff" name="sliders" size={16} />
+        <Text style={styles.sectionTitle}>{t('quickAdjust')}</Text>
+      </View>
+      <QuickControls actions={control.actions} display={display} t={t} />
+      <SegmentedTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        t={t}
+        tabs={tabs}
+      />
+      {activeTab === 'display' ? (
+        <DisplayPanel actions={control.actions} display={display} t={t} />
+      ) : null}
+      {activeTab === 'color' ? (
+        <ColorPanel actions={control.actions} display={display} t={t} />
+      ) : null}
+      {activeTab === 'arrange' ? (
+        <ArrangementPanel actions={control.actions} display={display} t={t} />
+      ) : null}
+      {activeTab === 'input' ? (
+        <InputPanel actions={control.actions} display={display} t={t} />
+      ) : null}
+      {activeTab === 'advanced' ? (
+        <AdvancedDisplayPanel control={control} display={display} t={t} />
+      ) : null}
+    </View>
+  );
+}
+
+function QuickControls({
+  actions,
+  display,
+  t,
+}: {
+  actions: DisplayActions;
+  display: DisplayControlDisplay;
+  t: (key: TranslationKey) => string;
+}) {
+  const brightnessValue =
+    display.brightnessControl === 'native'
+      ? display.nativeBrightness
+      : display.supportsDdc
+        ? display.ddc.brightness / 100
+        : 0;
+
+  return (
+    <View>
+      {display.supportsBrightness || display.supportsDdc ? (
+        <ControlSlider
+          label={t('brightness')}
+          onChange={(value) =>
+            display.brightnessControl === 'native'
+              ? actions.setNativeBrightness(display.id, value)
+              : actions.setDdcControl(display.id, 0x10, Math.round(value * 100))
+          }
+          presets={[0.25, 0.5, 0.75, 1]}
+          value={brightnessValue}
+        />
+      ) : (
+        <Notice text={t('noNativeBrightness')} />
+      )}
+      {display.supportsSoftwareDimming ? (
+        <ControlSlider
+          label={t('dimming')}
+          onChange={(value) => actions.setSoftwareDimming(display.id, value)}
+          presets={[0, 0.25, 0.5, 0.8]}
+          value={display.softwareDimming}
+        />
+      ) : null}
+      <ResolutionPicker
+        display={display}
+        onFavorite={(modeID) => actions.saveFavoriteMode(display.id, modeID)}
+        onRemoveFavorite={(modeID) =>
+          actions.removeFavoriteMode(display.id, modeID)
+        }
+        onSelect={(modeID) => actions.setDisplayMode(display.id, modeID)}
+        t={t}
+      />
+    </View>
+  );
+}
+
+function DisplayPanel({
+  actions,
+  display,
+  t,
+}: {
+  actions: DisplayActions;
+  display: DisplayControlDisplay;
+  t: (key: TranslationKey) => string;
+}) {
+  return (
+    <View style={styles.panel}>
+      <Metric label={t('resolution')} value={modeLabel(display.currentMode)} />
+      <Metric
+        label={t('refreshRate')}
+        value={`${display.currentMode.refreshRate}Hz`}
+      />
+      <Metric label={t('connection')} value={connectionLabel(display, t)} />
+      {display.brightnessError ? (
+        <Notice text={display.brightnessError} />
+      ) : null}
+      <ActionRow>
+        <ActionButton
+          icon="refresh"
+          label={t('refreshNow')}
+          onPress={actions.refreshSnapshot}
+        />
+      </ActionRow>
+    </View>
+  );
+}
+
+function ColorPanel({
+  actions,
+  display,
+  t,
+}: {
+  actions: DisplayActions;
+  display: DisplayControlDisplay;
+  t: (key: TranslationKey) => string;
+}) {
+  const currentProfile = display.colorProfiles.find(
+    (profile) => profile.isCurrent,
+  );
+
+  return (
+    <View style={styles.panel}>
+      <Metric
+        label={t('colorHdr')}
+        value={display.hdr.isActive ? t('hdrOn') : t('hdrOff')}
+      />
+      <Metric
+        label={t('xdrHeadroom')}
+        value={`${display.hdr.currentHeadroom.toFixed(1)} / ${display.hdr.potentialHeadroom.toFixed(1)}`}
+      />
+      <View style={styles.itemHeader}>
+        <View style={styles.itemTextBlock}>
+          <Text style={styles.itemTitle}>
+            {currentProfile?.name ?? t('noColorProfile')}
+          </Text>
+          <Text style={styles.itemMeta}>
+            {display.colorProfiles.length} {t('colorProfile')}
+          </Text>
+        </View>
+        <ActionButton
+          icon="refresh"
+          label={t('reset')}
+          onPress={() => actions.resetColorProfile(display.id)}
+          small
+        />
+      </View>
+      {display.colorProfiles.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.chipRow}>
+            {display.colorProfiles.map((profile) => (
+              <ProfileChip
+                key={profile.id}
+                onSelect={(profileID) =>
+                  actions.setColorProfile(display.id, profileID)
+                }
+                profile={profile}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
+        <Notice text={t('noColorProfiles')} />
+      )}
+      {display.colorProfileError ? (
+        <Notice text={display.colorProfileError} />
+      ) : null}
+    </View>
+  );
+}
+
+function ArrangementPanel({
+  actions,
+  display,
+  t,
+}: {
+  actions: DisplayActions;
+  display: DisplayControlDisplay;
+  t: (key: TranslationKey) => string;
+}) {
+  const step = 100;
+  const moves = [
+    { label: t('moveUp'), x: display.frame.x, y: display.frame.y - step },
+    { label: t('moveLeft'), x: display.frame.x - step, y: display.frame.y },
+    { label: t('moveRight'), x: display.frame.x + step, y: display.frame.y },
+    { label: t('moveDown'), x: display.frame.x, y: display.frame.y + step },
+  ];
+
+  return (
+    <View style={styles.panel}>
+      <Metric
+        label={t('arrangement')}
+        value={`${Math.round(display.frame.x)}, ${Math.round(display.frame.y)}`}
+      />
+      <ActionRow>
+        {moves.map((move) => (
+          <ActionButton
+            key={move.label}
+            icon="layout"
+            label={move.label}
+            onPress={() => actions.setDisplayOrigin(display.id, move.x, move.y)}
+          />
+        ))}
+      </ActionRow>
+      <ActionRow>
+        {[0, 90, 180, 270].map((rotation) => (
+          <ActionButton
+            key={rotation}
+            icon="refresh"
+            label={`${rotation}`}
+            onPress={() => actions.setDisplayRotation(display.id, rotation)}
+            selected={Math.round(display.rotation) === rotation}
+          />
+        ))}
+      </ActionRow>
+    </View>
+  );
+}
+
+function InputPanel({
+  actions,
+  display,
+  t,
+}: {
+  actions: DisplayActions;
+  display: DisplayControlDisplay;
+  t: (key: TranslationKey) => string;
+}) {
+  if (!display.supportsDdc) {
+    return (
+      <View style={styles.panel}>
+        <Notice text={t('noDdc')} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.panel}>
+      <ControlSlider
+        label={t('contrast')}
+        onChange={(value) =>
+          actions.setDdcControl(display.id, 0x12, Math.round(value * 100))
+        }
+        presets={[0.25, 0.5, 0.75, 1]}
+        value={display.ddc.contrast / 100}
+      />
+      <ControlSlider
+        label={t('volume')}
+        onChange={(value) =>
+          actions.setDdcControl(display.id, 0x62, Math.round(value * 100))
+        }
+        presets={[0, 0.25, 0.5, 0.75]}
+        value={display.ddc.volume / 100}
+      />
+      <Text style={styles.itemTitle}>{t('inputSource')}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.chipRow}>
+          {inputOptions.map((option) => (
+            <ActionButton
+              key={option.value}
+              icon="plug"
+              label={option.label}
+              onPress={() =>
+                actions.setDdcControl(display.id, 0x60, option.value)
+              }
+              selected={Math.round(display.ddc.inputSource) === option.value}
+              small
+            />
+          ))}
+        </View>
+      </ScrollView>
+      {display.ddc.lastError ? <Notice text={display.ddc.lastError} /> : null}
+    </View>
+  );
+}
+
+function AdvancedDisplayPanel({
+  control,
+  display,
+  t,
+}: {
+  control: DisplayControlState;
+  display: DisplayControlDisplay;
+  t: (key: TranslationKey) => string;
+}) {
+  const actions = control.actions;
+  const modeDraft = useMemo(
+    () => ({
+      height: `${display.currentMode.height}`,
+      refreshRate: `${Math.round(display.currentMode.refreshRate || 60)}`,
+      width: `${display.currentMode.width}`,
+    }),
+    [
+      display.currentMode.height,
+      display.currentMode.refreshRate,
+      display.currentMode.width,
+    ],
+  );
+  const [customWidth, setCustomWidth] = useState(modeDraft.width);
+  const [customHeight, setCustomHeight] = useState(modeDraft.height);
+  const [customRefreshRate, setCustomRefreshRate] = useState(
+    modeDraft.refreshRate,
+  );
+  const [customIsHiDpi, setCustomIsHiDpi] = useState(true);
+
+  useEffect(() => {
+    setCustomWidth(modeDraft.width);
+    setCustomHeight(modeDraft.height);
+    setCustomRefreshRate(modeDraft.refreshRate);
+  }, [display.id, modeDraft.height, modeDraft.refreshRate, modeDraft.width]);
+
+  const customResolutionDraft = {
+    height: positiveNumberFromInput(customHeight, display.currentMode.height),
+    isHiDpi: customIsHiDpi,
+    refreshRate: positiveNumberFromInput(
+      customRefreshRate,
+      display.currentMode.refreshRate || 60,
+    ),
+    width: positiveNumberFromInput(customWidth, display.currentMode.width),
+  };
+
+  return (
+    <View style={styles.panel}>
+      <Metric
+        label={t('displayInfo')}
+        value={`${display.identity.productName} / ${display.identity.transport}`}
+      />
+      <Text style={styles.rawText}>UUID {display.identity.uuid || 'n/a'}</Text>
+      <Text style={styles.rawText}>
+        Vendor {display.identity.vendorID} / Model {display.identity.modelID} /
+        Serial {display.identity.serialNumber || 'n/a'}
+      </Text>
+      <Text style={styles.itemTitle}>{t('displayInfo')}</Text>
+      <ActionRow>
+        <ActionButton
+          icon="download"
+          label={t('exportInfo')}
+          onPress={() => actions.exportEdid(display.id)}
+        />
+      </ActionRow>
+      <Text style={styles.itemTitle}>{t('compatibilitySettings')}</Text>
+      <ActionRow>
+        <ActionButton
+          icon="settings"
+          label={t('prepareSettings')}
+          onPress={() => actions.queueEdidOverride(display.id)}
+        />
+        <ActionButton
+          icon="settings"
+          label={t('clearSettings')}
+          onPress={() => actions.clearEdidOverride(display.id)}
+        />
+      </ActionRow>
+      <Text style={styles.itemTitle}>{t('settingsFile')}</Text>
+      <ActionRow>
+        <ActionButton
+          icon="download"
+          label={t('createFile')}
+          onPress={() => actions.writeOverrideBundle(display.id)}
+        />
+      </ActionRow>
+      <Text style={styles.itemTitle}>{t('extraBrightness')}</Text>
+      <ActionRow>
+        <ActionButton
+          icon="zap"
+          label={t('enable')}
+          onPress={() => actions.enableXdrUpscale(display.id)}
+        />
+        <ActionButton
+          icon="zap"
+          label={t('disable')}
+          onPress={() => actions.disableXdrUpscale(display.id)}
+        />
+      </ActionRow>
+      <ActionRow>
+        <ActionButton
+          icon="plug"
+          label={t('sleep')}
+          onPress={() => actions.softDisconnectDisplay(display.id)}
+        />
+        <ActionButton
+          icon="plug"
+          label={t('wake')}
+          onPress={() => actions.reconnectDisplay(display.id)}
+        />
+      </ActionRow>
+
+      <Text style={styles.itemTitle}>{t('customResolution')}</Text>
+      <View style={styles.inputRow}>
+        <SmallInput
+          accessibilityLabel={t('width')}
+          onChangeText={setCustomWidth}
+          value={customWidth}
+        />
+        <SmallInput
+          accessibilityLabel={t('height')}
+          onChangeText={setCustomHeight}
+          value={customHeight}
+        />
+        <SmallInput
+          accessibilityLabel={t('hz')}
+          onChangeText={setCustomRefreshRate}
+          value={customRefreshRate}
+        />
+        <ActionButton
+          icon="sparkles"
+          label={t('hidpi')}
+          onPress={() => setCustomIsHiDpi((value) => !value)}
+          selected={customIsHiDpi}
+          small
+        />
+      </View>
+      <ActionRow>
+        <ActionButton
+          icon="display"
+          label={t('queue')}
+          onPress={() =>
+            actions.addCustomResolution(display, customResolutionDraft)
+          }
+        />
+      </ActionRow>
+      {display.advanced.customResolutions.map((request) => (
+        <View key={request.id} style={styles.itemHeader}>
+          <View style={styles.itemTextBlock}>
+            <Text style={styles.itemTitle}>
+              {request.width} x {request.height}
+            </Text>
+            <Text style={styles.itemMeta}>{request.status}</Text>
+          </View>
+          <ActionButton
+            icon="settings"
+            label={t('remove')}
+            onPress={() =>
+              actions.removeCustomResolution(display.id, request.id)
+            }
+            small
+          />
+        </View>
+      ))}
+      <AutomationPanel control={control} t={t} />
+    </View>
+  );
+}
+
+function AutomationPanel({
+  control,
+  t,
+}: {
+  control: DisplayControlState;
+  t: (key: TranslationKey) => string;
+}) {
+  const {
+    actions,
+    presetName,
+    setPresetName,
+    setSyncGroupName,
+    snapshot,
+    syncGroupName,
+  } = control;
+
+  return (
+    <View style={styles.automation}>
+      <Text style={styles.itemTitle}>{t('presets')}</Text>
+      <View style={styles.inputRow}>
+        <TextInput
+          onChangeText={setPresetName}
+          placeholder={t('presetName')}
+          placeholderTextColor="#656a76"
+          style={styles.textInput}
+          value={presetName}
+        />
+        <ActionButton
+          icon="download"
+          label={t('save')}
+          onPress={actions.savePreset}
+          small
+        />
+      </View>
+      {snapshot.presets.map((preset) => (
+        <View key={preset.name} style={styles.itemHeader}>
+          <View style={styles.itemTextBlock}>
+            <Text style={styles.itemTitle}>{preset.name}</Text>
+            <Text style={styles.itemMeta}>{preset.displayCount}</Text>
+          </View>
+          <ActionButton
+            icon="check"
+            label={t('apply')}
+            onPress={() => actions.applyPreset(preset.name)}
+            small
+          />
+          <ActionButton
+            icon="settings"
+            label={t('delete')}
+            onPress={() => actions.deletePreset(preset.name)}
+            small
+          />
+        </View>
+      ))}
+
+      <Text style={styles.itemTitle}>{t('syncLayout')}</Text>
+      <View style={styles.inputRow}>
+        <TextInput
+          onChangeText={setSyncGroupName}
+          placeholder={t('groupName')}
+          placeholderTextColor="#656a76"
+          style={styles.textInput}
+          value={syncGroupName}
+        />
+        <ActionButton
+          icon="download"
+          label={t('saveGroup')}
+          onPress={actions.saveSyncGroup}
+          small
+        />
+      </View>
+      <ActionRow>
+        <ActionButton
+          icon="settings"
+          label={t('protect')}
+          onPress={actions.saveProtectedLayout}
+        />
+        <ActionButton
+          icon="refresh"
+          label={t('restore')}
+          onPress={actions.restoreProtectedLayout}
+        />
+        <ActionButton
+          icon="settings"
+          label={t('clear')}
+          onPress={actions.clearProtectedLayout}
+        />
+      </ActionRow>
+      {snapshot.syncGroups.map((group) => (
+        <View key={group.id} style={styles.itemHeader}>
+          <View style={styles.itemTextBlock}>
+            <Text style={styles.itemTitle}>{group.name}</Text>
+            <Text style={styles.itemMeta}>{group.displayIDs.length}</Text>
+          </View>
+          <ActionButton
+            icon="check"
+            label={t('apply')}
+            onPress={() => actions.applySyncGroup(group.id)}
+            small
+          />
+          <ActionButton
+            icon="settings"
+            label={t('delete')}
+            onPress={() => actions.deleteSyncGroup(group.id)}
+            small
+          />
+        </View>
+      ))}
+
+      <Text style={styles.itemTitle}>{t('appSettings')}</Text>
+      <ActionRow>
+        <ActionButton
+          icon="refresh"
+          label={t('autoRefresh')}
+          onPress={() =>
+            actions.setSettings(
+              !snapshot.settings.autoRefresh,
+              snapshot.settings.refreshIntervalSeconds,
+              snapshot.settings.showAdvancedMetadata,
+            )
+          }
+          selected={snapshot.settings.autoRefresh}
+        />
+        <ActionButton
+          icon="info"
+          label={t('details')}
+          onPress={() =>
+            actions.setSettings(
+              snapshot.settings.autoRefresh,
+              snapshot.settings.refreshIntervalSeconds,
+              !snapshot.settings.showAdvancedMetadata,
+            )
+          }
+          selected={snapshot.settings.showAdvancedMetadata}
+        />
+      </ActionRow>
+      <ActionRow>
+        {[5, 15, 30, 60].map((seconds) => (
+          <ActionButton
+            key={seconds}
+            label={`${seconds}s`}
+            onPress={() =>
+              actions.setSettings(
+                snapshot.settings.autoRefresh,
+                seconds,
+                snapshot.settings.showAdvancedMetadata,
+              )
+            }
+            selected={snapshot.settings.refreshIntervalSeconds === seconds}
+          />
+        ))}
+      </ActionRow>
+    </View>
+  );
+}
+
+function ProfileChip({
+  onSelect,
+  profile,
+}: {
+  onSelect: (profileID: string) => void;
+  profile: DisplayControlColorProfile;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onSelect(profile.id)}
+      style={({ pressed }) => [
+        styles.chip,
+        profile.isCurrent && styles.chipSelected,
+        pressed && styles.actionPressed,
+      ]}
+    >
+      <Text
+        style={[styles.chipText, profile.isCurrent && styles.chipTextSelected]}
+      >
+        {profile.name}
+      </Text>
+    </Pressable>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function Notice({ text }: { text: string }) {
+  return (
+    <View style={styles.notice}>
+      <Text style={styles.noticeText}>{text}</Text>
+    </View>
+  );
+}
+
+function ActionRow({ children }: { children: ReactNode }) {
+  return <View style={styles.actionRow}>{children}</View>;
+}
+
+function ActionButton({
+  icon,
+  label,
+  onPress,
+  selected,
+  small,
+}: {
+  icon?: IconName;
+  label: string;
+  onPress: () => void;
+  selected?: boolean;
+  small?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.action,
+        small && styles.actionSmall,
+        selected && styles.actionSelected,
+        pressed && styles.actionPressed,
+      ]}
+    >
+      {icon ? (
+        <Icon color={selected ? '#ffffff' : '#b2b6bd'} name={icon} size={13} />
+      ) : null}
+      <Text
+        style={[
+          styles.actionText,
+          icon && styles.actionTextWithIcon,
+          selected && styles.actionTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SmallInput({
+  accessibilityLabel,
+  onChangeText,
+  value,
+}: {
+  accessibilityLabel: string;
+  onChangeText: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <TextInput
+      accessibilityLabel={accessibilityLabel}
+      onChangeText={onChangeText}
+      style={styles.smallInput}
+      value={value}
+    />
+  );
+}
+
+function connectionLabel(
+  display: DisplayControlDisplay,
+  t: (key: TranslationKey) => string,
+) {
+  if (display.isAsleep) {
+    return t('asleep');
+  }
+
+  if (!display.isActive) {
+    return t('inactive');
+  }
+
+  return display.isBuiltin ? t('builtIn') : t('external');
+}
+
+function positiveNumberFromInput(value: string, fallback: number) {
+  const parsed = Number(value.replace(/[^0-9.]/g, ''));
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return Math.max(fallback, 1);
+  }
+
+  return parsed;
+}
+
+const inputOptions = [
+  { label: 'VGA', value: 1 },
+  { label: 'DVI', value: 3 },
+  { label: 'DP1', value: 15 },
+  { label: 'DP2', value: 16 },
+  { label: 'HDMI1', value: 17 },
+  { label: 'HDMI2', value: 18 },
+  { label: 'USB-C', value: 27 },
+];
+
+const styles = StyleSheet.create({
+  sectionTitle: {
+    color: '#ffffff',
+    fontFamily: font.family,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0,
+    lineHeight: 20,
+    marginLeft: 7,
+  },
+  sectionTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  panel: {
+    backgroundColor: '#15181e',
+    borderColor: 'rgba(178,182,189,0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+  },
+  metric: {
+    backgroundColor: '#1f232b',
+    borderColor: '#252830',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+    padding: 10,
+  },
+  metricLabel: {
+    color: '#656a76',
+    fontFamily: font.family,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    lineHeight: 14,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    color: '#ffffff',
+    fontFamily: font.family,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  itemHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  itemTextBlock: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
+  },
+  itemTitle: {
+    color: '#ffffff',
+    fontFamily: font.family,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  itemMeta: {
+    color: '#656a76',
+    fontFamily: font.family,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    paddingRight: 8,
+  },
+  chip: {
+    backgroundColor: '#1f232b',
+    borderColor: '#252830',
+    borderRadius: 6,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginRight: 8,
+    minHeight: 40,
+    paddingHorizontal: 10,
+  },
+  chipSelected: {
+    backgroundColor: '#2b89ff',
+    borderColor: '#2b89ff',
+  },
+  chipText: {
+    color: '#b2b6bd',
+    fontFamily: font.family,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 15,
+  },
+  chipTextSelected: {
+    color: '#ffffff',
+  },
+  notice: {
+    backgroundColor: 'rgba(255,207,37,0.12)',
+    borderColor: 'rgba(255,207,37,0.35)',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+    padding: 10,
+  },
+  noticeText: {
+    color: '#fbeabf',
+    fontFamily: font.family,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  action: {
+    alignItems: 'center',
+    backgroundColor: '#1f232b',
+    borderColor: '#252830',
+    borderRadius: 6,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginRight: 8,
+    minHeight: 34,
+    paddingHorizontal: 8,
+  },
+  actionSmall: {
+    flex: 0,
+    minWidth: 62,
+  },
+  actionSelected: {
+    backgroundColor: '#2b89ff',
+    borderColor: '#2b89ff',
+  },
+  actionPressed: {
+    backgroundColor: '#3b3d45',
+  },
+  actionText: {
+    color: '#b2b6bd',
+    fontFamily: font.family,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 15,
+  },
+  actionTextSelected: {
+    color: '#ffffff',
+  },
+  actionTextWithIcon: {
+    marginLeft: 5,
+  },
+  rawText: {
+    color: '#656a76',
+    fontFamily: font.family,
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 15,
+    marginTop: 4,
+  },
+  inputRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  smallInput: {
+    backgroundColor: '#15181e',
+    borderColor: '#252830',
+    borderRadius: 6,
+    borderWidth: 1,
+    color: '#ffffff',
+    flex: 1,
+    fontFamily: font.family,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginRight: 8,
+    minHeight: 34,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  textInput: {
+    backgroundColor: '#15181e',
+    borderColor: '#252830',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#ffffff',
+    flex: 1,
+    fontFamily: font.family,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+    marginRight: 8,
+    minHeight: 40,
+    minWidth: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  automation: {
+    borderTopColor: 'rgba(178,182,189,0.1)',
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 10,
+  },
+});

@@ -45,7 +45,7 @@ test('React Native host view is moved into an NSPopover backed by NSStatusItem',
   );
   expect(appDelegate).toContain('self.statusPopover = [NSPopover new]');
   expect(appDelegate).toContain(
-    'self.statusPopover.contentSize = NSMakeSize(460, 680)',
+    'self.statusPopover.contentSize = NSMakeSize(520, 720)',
   );
   expect(appDelegate).toContain(
     'self.statusPopover.contentViewController = rootViewController',

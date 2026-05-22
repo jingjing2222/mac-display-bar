@@ -7,16 +7,30 @@ const spec = readFileSync(
   'utf8',
 );
 const app = readFileSync(join(repoRoot, 'App.tsx'), 'utf8');
+const packageJson = readFileSync(join(repoRoot, 'package.json'), 'utf8');
+const iconSource = readFileSync(
+  join(repoRoot, 'src/components/Icon.tsx'),
+  'utf8',
+);
 const displayControlApi = readFileSync(
   join(repoRoot, 'src/native/displayControlApi.ts'),
   'utf8',
 );
+const appEnvironmentApi = readFileSync(
+  join(repoRoot, 'src/native/appEnvironmentApi.ts'),
+  'utf8',
+);
+const i18nHook = readFileSync(join(repoRoot, 'src/i18n/useI18n.ts'), 'utf8');
 const displayControlHook = readFileSync(
   join(repoRoot, 'src/hooks/display/useDisplayControl.ts'),
   'utf8',
 );
-const displayList = readFileSync(
-  join(repoRoot, 'src/components/DisplayList.tsx'),
+const menuShell = readFileSync(
+  join(repoRoot, 'src/components/MenuShell.tsx'),
+  'utf8',
+);
+const displayControlPanel = readFileSync(
+  join(repoRoot, 'src/components/DisplayControlPanel.tsx'),
   'utf8',
 );
 const topLevelDisplayHookPath = join(
@@ -247,25 +261,50 @@ test('native API wrapper owns direct TurboModule calls', () => {
 
   expect(app).not.toContain('NativeDisplayControl?.');
   expect(app).toContain('./src/hooks/display/useDisplayControl');
+  expect(app).toContain('<MenuShell control={control} />');
   expect(displayControlHook).toContain('useDisplaySnapshot');
   expect(displayControlHook).toContain('useDisplayControlActions');
   expect(existsSync(topLevelDisplayHookPath)).toBe(false);
 });
 
-test('menu popover content scrolls as one panel', () => {
-  expect(app).toContain('ScrollView');
-  expect(app).toContain('contentContainerStyle={styles.panelContent}');
-  expect(displayList).not.toContain(
-    'contentContainerStyle={styles.displayListContent}',
+test('i18n reads system locale through native API instead of Intl', () => {
+  expect(spec).toContain('getSystemLocale(): string');
+  expect(bridge).toContain('- (NSString *)getSystemLocale');
+  expect(bridge).toContain('[NSLocale preferredLanguages]');
+  expect(appEnvironmentApi).toContain(
+    'NativeDisplayControl?.getSystemLocale()',
+  );
+  expect(i18nHook).toContain('appEnvironmentApi.getSystemLocale()');
+  expect(i18nHook).not.toContain('Intl.');
+});
+
+test('menu shell owns fixed header and scrollable content', () => {
+  expect(menuShell).toContain('TopUpdateHeader');
+  expect(menuShell).toContain('ScrollView');
+  expect(menuShell).toContain('contentContainerStyle={styles.content}');
+  expect(menuShell).toContain('width: 520');
+  expect(menuShell).toContain('height: 720');
+  expect(existsSync(join(repoRoot, 'src/components/DisplayList.tsx'))).toBe(
+    false,
   );
 });
 
+test('menu UI uses react-native-svg backed public icon paths', () => {
+  expect(packageJson).toContain('"react-native-svg"');
+  expect(iconSource).toContain("from 'react-native-svg'");
+  expect(iconSource).toContain('name: IconName');
+  expect(iconSource).toContain("case 'display'");
+  expect(iconSource).toContain("case 'sliders'");
+});
+
 test('custom resolution drafts follow current mode snapshot changes', () => {
-  expect(displayList).toContain('const modeDraft = useMemo');
-  expect(displayList).toContain('setCustomWidth(modeDraft.width)');
-  expect(displayList).toContain('setCustomHeight(modeDraft.height)');
-  expect(displayList).toContain('setCustomRefreshRate(modeDraft.refreshRate)');
-  expect(displayList).toContain('display.id');
+  expect(displayControlPanel).toContain('const modeDraft = useMemo');
+  expect(displayControlPanel).toContain('setCustomWidth(modeDraft.width)');
+  expect(displayControlPanel).toContain('setCustomHeight(modeDraft.height)');
+  expect(displayControlPanel).toContain(
+    'setCustomRefreshRate(modeDraft.refreshRate)',
+  );
+  expect(displayControlPanel).toContain('display.id');
 });
 
 test('display snapshots do not mutate AppKit dimming windows', () => {

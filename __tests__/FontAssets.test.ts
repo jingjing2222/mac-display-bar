@@ -17,7 +17,17 @@ const projectFile = readFileSync(
   ),
   'utf8',
 );
-const appSource = readFileSync(join(repoRoot, 'App.tsx'), 'utf8');
+const uiSources = [
+  'src/components/MenuShell.tsx',
+  'src/components/TopUpdateHeader.tsx',
+  'src/components/DisplayDropdown.tsx',
+  'src/components/DisplayControlPanel.tsx',
+  'src/components/ControlSlider.tsx',
+  'src/components/ResolutionPicker.tsx',
+  'src/components/SegmentedTabs.tsx',
+]
+  .map((path) => readFileSync(join(repoRoot, path), 'utf8'))
+  .join('\n');
 
 test('Inter font files are bundled with the macOS target', () => {
   for (const filename of [
@@ -37,6 +47,6 @@ test('Inter font files are bundled with the macOS target', () => {
 });
 
 test('React Native text styles use the bundled Inter font family', () => {
-  expect(appSource).toContain("family: 'Inter'");
-  expect(appSource).toContain('fontFamily: font.family');
+  expect(uiSources).toContain("family: 'Inter'");
+  expect(uiSources).toContain('fontFamily: font.family');
 });

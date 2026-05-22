@@ -155,6 +155,7 @@ export type DisplayControlSnapshot = {
 };
 
 export interface Spec extends TurboModule {
+  getSystemLocale(): string;
   getSnapshot(): DisplayControlSnapshot;
   refreshSnapshot(): DisplayControlSnapshot;
   setNativeBrightness(displayID: string, level: number): DisplayControlSnapshot;

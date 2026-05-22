@@ -36,7 +36,7 @@
   self.statusPopover.behavior = NSPopoverBehaviorTransient;
   self.statusPopover.delegate = self;
   self.statusPopover.animates = YES;
-  self.statusPopover.contentSize = NSMakeSize(460, 680);
+  self.statusPopover.contentSize = NSMakeSize(520, 720);
   self.statusPopover.contentViewController = rootViewController;
 
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
