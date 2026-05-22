@@ -17,6 +17,7 @@ export default defineConfig({
       'macos/com.jingjing2222.macdisplaybar-macOS/NativeFoo',
       'macos/com.jingjing2222.macdisplaybar-macOS/com.jingjing2222.macdisplaybar.entitlements',
       'macos/com.jingjing2222.macdisplaybar-macOS/main.m',
+      'macos/fingerprint-version.txt',
       'macos/com.jingjing2222.macdisplaybar.xcodeproj/project.pbxproj',
       'macos/Podfile',
       'macos/Podfile.lock',
