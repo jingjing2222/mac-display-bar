@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
 
 const infoPlistPath = 'macos/com.jingjing2222.macdisplaybar-macOS/Info.plist';
 
-const packageVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const infoVersion = readInfoVersion(readFileSync(infoPlistPath, 'utf8'));
 const tag = process.env.RELEASE_TAG ?? '';
 const tagVersion = tag.startsWith('v') ? tag.slice(1) : tag;
@@ -14,15 +12,9 @@ if (!tagVersion) {
   errors.push('RELEASE_TAG is required.');
 }
 
-if (packageVersion !== infoVersion) {
+if (tagVersion && infoVersion !== tagVersion) {
   errors.push(
-    `package.json version (${packageVersion}) must match ${basename(infoPlistPath)} CFBundleShortVersionString (${infoVersion}).`,
-  );
-}
-
-if (tagVersion && packageVersion !== tagVersion) {
-  errors.push(
-    `Release tag (${tag}) must match package.json version (${packageVersion}).`,
+    `Release tag (${tag}) must match ${infoPlistPath} CFBundleShortVersionString (${infoVersion}).`,
   );
 }
 
@@ -33,7 +25,7 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Release version OK: ${packageVersion}`);
+console.log(`Release version OK: ${infoVersion}`);
 
 function readInfoVersion(plist) {
   const match = plist.match(
