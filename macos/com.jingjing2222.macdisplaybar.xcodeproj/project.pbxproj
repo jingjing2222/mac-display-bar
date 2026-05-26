@@ -18,6 +18,9 @@
 		7A1D5C0A2E9B4D0E9A5A1003 /* RCTNativeFoo.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D5C092E9B4D0E9A5A1003 /* RCTNativeFoo.mm */; };
 		7A1D5D0A2E9B4D0E9A5A1004 /* RCTNativeDisplayControl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D5D092E9B4D0E9A5A1004 /* RCTNativeDisplayControl.mm */; };
 		7A1D5E0A2E9B4D0E9A5A1005 /* RCTDisplayCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D5E092E9B4D0E9A5A1005 /* RCTDisplayCore.mm */; };
+		9A0000010000000000000001 /* RCTDisplayCoreNativeTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000040000000000000004 /* RCTDisplayCoreNativeTests.mm */; };
+		9A0000020000000000000002 /* RCTDisplayCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D5E092E9B4D0E9A5A1005 /* RCTDisplayCore.mm */; };
+		9A0000030000000000000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A0000060000000000000006 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +43,9 @@
 		7A1D5E082E9B4D0E9A5A1005 /* RCTDisplayCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RCTDisplayCore.h; sourceTree = "<group>"; };
 		7A1D5E092E9B4D0E9A5A1005 /* RCTDisplayCore.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = RCTDisplayCore.mm; sourceTree = "<group>"; };
 		7B04C3734B71B46990060803 /* libPods-com.jingjing2222.macdisplaybar-macOS.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-com.jingjing2222.macdisplaybar-macOS.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A0000040000000000000004 /* RCTDisplayCoreNativeTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = RCTDisplayCoreNativeTests.mm; sourceTree = "<group>"; };
+		9A0000050000000000000005 /* macDisplayBarNativeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = macDisplayBarNativeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A0000060000000000000006 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = "<absolute>"; };
 		B875B286F34C53F0AAAC1472 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -60,12 +66,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A0000080000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A0000030000000000000003 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				9A0000060000000000000006 /* XCTest.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				7B04C3734B71B46990060803 /* libPods-com.jingjing2222.macdisplaybar-macOS.a */,
 			);
@@ -128,6 +143,7 @@
 			isa = PBXGroup;
 			children = (
 				5142014A2437B4B30078DB4F /* com.jingjing2222.macdisplaybar-macOS */,
+				9A0000070000000000000007 /* com.jingjing2222.macdisplaybarTests */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
@@ -144,8 +160,17 @@
 			children = (
 				13B07F961A680F5B00A75B9A /* com.jingjing2222.macdisplaybar.app */,
 				514201492437B4B30078DB4F /* macDisplayBar.app */,
+				9A0000050000000000000005 /* macDisplayBarNativeTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9A0000070000000000000007 /* com.jingjing2222.macdisplaybarTests */ = {
+			isa = PBXGroup;
+			children = (
+				9A0000040000000000000004 /* RCTDisplayCoreNativeTests.mm */,
+			);
+			path = "com.jingjing2222.macdisplaybarTests";
 			sourceTree = "<group>";
 		};
 		CD4F2CC0C9A1C5EDA54538FD /* Pods */ = {
@@ -200,6 +225,23 @@
 			productReference = 514201492437B4B30078DB4F /* macDisplayBar.app */;
 			productType = "com.apple.product-type.application";
 		};
+		9A00000B000000000000000B /* macDisplayBarNativeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9A00000E000000000000000E /* Build configuration list for PBXNativeTarget "macDisplayBarNativeTests" */;
+			buildPhases = (
+				9A00000A000000000000000A /* Sources */,
+				9A0000080000000000000008 /* Frameworks */,
+				9A0000090000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = macDisplayBarNativeTests;
+			productName = macDisplayBarNativeTests;
+			productReference = 9A0000050000000000000005 /* macDisplayBarNativeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -232,6 +274,7 @@
 			targets = (
 				13B07F861A680F5B00A75B9A /* com.jingjing2222.macdisplaybar-iOS */,
 				514201482437B4B30078DB4F /* com.jingjing2222.macdisplaybar-macOS */,
+				9A00000B000000000000000B /* macDisplayBarNativeTests */,
 			);
 		};
 /* End PBXProject section */
@@ -253,6 +296,13 @@
 				514201552437B4B40078DB4F /* Main.storyboard in Resources */,
 				6F1A8E8A0CBF47D9B2765301 /* Fonts in Resources */,
 				17F39AE699EA5B1B65BE6423 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A0000090000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -381,6 +431,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A00000A000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A0000020000000000000002 /* RCTDisplayCore.mm in Sources */,
+				9A0000010000000000000001 /* RCTDisplayCoreNativeTests.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXVariantGroup section */
@@ -480,6 +539,78 @@
 				PRODUCT_NAME = macDisplayBar;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		9A00000C000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					XCTest,
+					"-framework",
+					AppKit,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					CoreImage,
+					"-framework",
+					IOKit,
+					"-framework",
+					ColorSync,
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jingjing2222.macdisplaybar.NativeTests;
+				PRODUCT_NAME = macDisplayBarNativeTests;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		9A00000D000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					XCTest,
+					"-framework",
+					AppKit,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					CoreImage,
+					"-framework",
+					IOKit,
+					"-framework",
+					ColorSync,
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jingjing2222.macdisplaybar.NativeTests;
+				PRODUCT_NAME = macDisplayBarNativeTests;
+				SDKROOT = macosx;
 			};
 			name = Release;
 		};
@@ -621,6 +752,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		9A00000E000000000000000E /* Build configuration list for PBXNativeTarget "macDisplayBarNativeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9A00000C000000000000000C /* Debug */,
+				9A00000D000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
 		};
 		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "com.jingjing2222.macdisplaybar" */ = {
 			isa = XCConfigurationList;

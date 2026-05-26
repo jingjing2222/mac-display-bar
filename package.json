@@ -13,7 +13,8 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "start": "react-native start",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "test:native": "xcodebuild test -workspace macos/com.jingjing2222.macdisplaybar.xcworkspace -scheme macDisplayBarNativeTests -configuration Debug -derivedDataPath /tmp/mac-display-bar-native-tests CODE_SIGNING_ALLOWED=NO"
   },
   "dependencies": {
     "@hot-updater/react-native": "patch:@hot-updater/react-native@npm%3A0.32.0#~/.yarn/patches/@hot-updater-react-native-npm-0.32.0-8cbcc9f116.patch",

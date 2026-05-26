@@ -9,7 +9,9 @@ export type DisplayControlMode = {
   isHiDpi: boolean;
   isCurrent: boolean;
   isFavorite: boolean;
+  source?: 'coregraphics' | 'cgs' | 'generated';
   requiresOverride?: boolean;
+  requiresRestart?: boolean;
 };
 
 export type DisplayControlDdcState = {
@@ -71,6 +73,20 @@ export type DisplayControlAdvancedState = {
   edidOverrideStatus: string;
   overrideBundlePath: string;
   overrideBundleStatus: string;
+  overrideInstalledPath: string;
+  overrideBackupPath: string;
+  overrideInstalledHash: string;
+  overrideBackupHash: string;
+  overridePendingReboot: boolean;
+  overridePendingReinitialize: boolean;
+  overrideLastError: string;
+  nativePanelWidth: number;
+  nativePanelHeight: number;
+  nativePanelOverrideWidth: number;
+  nativePanelOverrideHeight: number;
+  nativePanelResolutionStatus: string;
+  flexibleScalingEnabled: boolean;
+  flexibleScalingStatus: string;
   rotationRequest: number;
   rotationStatus: string;
   softConnectionState: string;
@@ -121,6 +137,38 @@ export type DisplayControlPreset = {
   displayCount: number;
 };
 
+export type DisplayControlVirtualDisplay = {
+  id: string;
+  targetDisplayID: string;
+  targetIdentityKey: string;
+  displayID: string;
+  mirrorTargetDisplayID: string;
+  mirrorSourceDisplayID: string;
+  mirrorMode: string;
+  mirrorStatus: string;
+  mirrorUpdatedAt: number;
+  name: string;
+  width: number;
+  height: number;
+  refreshRate: number;
+  isHiDpi: boolean;
+  serialNumber: number;
+  status: string;
+  lastError: string;
+};
+
+export type DisplayControlPipWindow = {
+  id: string;
+  displayID: string;
+  name: string;
+  width: number;
+  height: number;
+  fps: number;
+  filter: string;
+  status: string;
+  lastError: string;
+};
+
 export type DisplayControlSyncGroup = {
   id: string;
   name: string;
@@ -147,6 +195,8 @@ export type DisplayControlSnapshot = {
   displayTopologyStatus: string;
   displayTopologyChangedAt: string;
   displays: Array<DisplayControlDisplay>;
+  virtualDisplays: Array<DisplayControlVirtualDisplay>;
+  pipWindows: Array<DisplayControlPipWindow>;
   presets: Array<DisplayControlPreset>;
   syncGroups: Array<DisplayControlSyncGroup>;
   layoutProtectionEnabled: boolean;
@@ -199,6 +249,19 @@ export interface Spec extends TurboModule {
   queueEdidOverride(displayID: string): DisplayControlSnapshot;
   clearEdidOverride(displayID: string): DisplayControlSnapshot;
   writeOverrideBundle(displayID: string): DisplayControlSnapshot;
+  installDisplayOverride(displayID: string): DisplayControlSnapshot;
+  removeDisplayOverride(displayID: string): DisplayControlSnapshot;
+  reinitializeDisplay(displayID: string): DisplayControlSnapshot;
+  setNativePanelResolutionOverride(
+    displayID: string,
+    width: number,
+    height: number,
+  ): DisplayControlSnapshot;
+  clearNativePanelResolutionOverride(displayID: string): DisplayControlSnapshot;
+  setFlexibleScalingEnabled(
+    displayID: string,
+    enabled: boolean,
+  ): DisplayControlSnapshot;
   setDisplayRotation(
     displayID: string,
     rotation: number,
@@ -207,6 +270,24 @@ export interface Spec extends TurboModule {
   disableXdrUpscale(displayID: string): DisplayControlSnapshot;
   softDisconnectDisplay(displayID: string): DisplayControlSnapshot;
   reconnectDisplay(displayID: string): DisplayControlSnapshot;
+  createVirtualDisplay(
+    targetDisplayID: string,
+    width: number,
+    height: number,
+    refreshRate: number,
+    isHiDpi: boolean,
+  ): DisplayControlSnapshot;
+  mirrorVirtualDisplayToTarget(
+    virtualDisplayID: string,
+  ): DisplayControlSnapshot;
+  stopVirtualDisplayMirroring(virtualDisplayID: string): DisplayControlSnapshot;
+  removeVirtualDisplay(virtualDisplayID: string): DisplayControlSnapshot;
+  openDisplayPip(displayID: string): DisplayControlSnapshot;
+  setPipWindowFilter(
+    pipWindowID: string,
+    filter: string,
+  ): DisplayControlSnapshot;
+  closeDisplayPip(pipWindowID: string): DisplayControlSnapshot;
   saveFavoriteMode(displayID: string, modeID: string): DisplayControlSnapshot;
   removeFavoriteMode(displayID: string, modeID: string): DisplayControlSnapshot;
   setDdcControl(

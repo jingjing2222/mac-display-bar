@@ -17,11 +17,14 @@ if (baseSha && !/^0+$/.test(baseSha)) {
   }
 }
 
+const currentTag = `v${currentVersion}`;
 const versionChanged =
-  previousVersion !== '' && previousVersion !== currentVersion;
+  previousVersion !== ''
+    ? previousVersion !== currentVersion
+    : !tagExists(currentTag);
 
 writeOutput('version', currentVersion);
-writeOutput('tag', `v${currentVersion}`);
+writeOutput('tag', currentTag);
 writeOutput('previous_version', previousVersion);
 writeOutput('version_changed', String(versionChanged));
 
@@ -33,6 +36,15 @@ console.log(
 
 function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' }).trim();
+}
+
+function tagExists(tag) {
+  try {
+    git(['rev-parse', '--verify', '--quiet', `refs/tags/${tag}`]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function readInfoVersion(plist) {

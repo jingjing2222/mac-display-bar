@@ -1,0 +1,6 @@
+#include "../Domains/VirtualDisplays/RCTDisplayCore+VirtualDisplayCreation.inc.mm"
+#include "../Domains/VirtualDisplays/RCTDisplayCore+VirtualDisplayRecords.inc.mm"
+#include "../Domains/VirtualDisplays/RCTDisplayCore+VirtualDisplayActivation.inc.mm"
+#include "../Domains/VirtualDisplays/RCTDisplayCore+VirtualDisplayMirror.inc.mm"
+#include "../Domains/VirtualDisplays/RCTDisplayCore+VirtualDisplayFallback.inc.mm"
+#include "../Domains/VirtualDisplays/RCTDisplayCore+VirtualDisplayRestore.inc.mm"

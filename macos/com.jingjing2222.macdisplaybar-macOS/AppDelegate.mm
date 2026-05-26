@@ -212,10 +212,16 @@ static NSString *const RCTDisplayPrivilegedInstallDidEndNotification =
 
 - (void)privilegedInstallWillBegin:(NSNotification *)notification
 {
-  dispatch_async(dispatch_get_main_queue(), ^{
+  void (^updatePopover)(void) = ^{
     self.privilegedPromptDepth += 1;
     self.statusPopover.behavior = NSPopoverBehaviorApplicationDefined;
-  });
+  };
+
+  if ([NSThread isMainThread]) {
+    updatePopover();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), updatePopover);
+  }
 }
 
 - (void)privilegedInstallDidEnd:(NSNotification *)notification

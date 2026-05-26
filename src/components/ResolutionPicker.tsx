@@ -7,7 +7,7 @@ import type {
 } from '../../specs/NativeDisplayControl';
 import type { TranslationKey } from '../i18n/strings';
 import { Icon } from './Icon';
-import { ModeSummary } from './ModeSummary';
+import { ModeSummary, modeScaleLabel } from './ModeSummary';
 import { ResolutionModeOverlay } from './ResolutionModeOverlay';
 import { ResolutionRevertOverlay } from './ResolutionRevertOverlay';
 import { StableLegendList } from './StableLegendList';
@@ -48,9 +48,20 @@ export function ResolutionPicker({
       refreshRate: selectedMode?.refreshRate,
     });
 
-    if (modeID === display.currentMode.id) {
+    if (modeID === display.currentMode.id || selectedMode?.isCurrent === true) {
       console.info(
         '[macDisplayBar] Resolution picker select ignored current mode',
+        {
+          displayID: display.id,
+          modeID,
+        },
+      );
+      return;
+    }
+
+    if (selectedMode?.requiresRestart === true) {
+      console.info(
+        '[macDisplayBar] Resolution picker select ignored restart-required mode',
         {
           displayID: display.id,
           modeID,
@@ -121,7 +132,7 @@ export function ResolutionPicker({
       >
         <Text style={styles.currentLabel}>{t('currentMode')}</Text>
         <View style={styles.currentValueRow}>
-          <ModeSummary mode={display.currentMode} />
+          <ModeSummary mode={display.currentMode} t={t} />
           <Icon color="#b2b6bd" name="chevronDown" size={15} />
         </View>
       </Pressable>
@@ -183,15 +194,18 @@ function ModePreviewRow({
   t: (key: TranslationKey) => string;
 }) {
   const requiresInstall = mode.requiresOverride === true;
+  const requiresRestart = mode.requiresRestart === true;
 
   return (
     <View style={[styles.modeRow, mode.isCurrent && styles.modeSelected]}>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled: requiresRestart }}
+        disabled={requiresRestart}
         onPress={() => onSelect(mode.id)}
         style={({ pressed }) => [
           styles.modeMain,
-          pressed && styles.modePressed,
+          pressed && !requiresRestart && styles.modePressed,
         ]}
       >
         <View style={styles.modeIcon}>
@@ -202,11 +216,13 @@ function ModePreviewRow({
           />
         </View>
         <View style={styles.modeTextBlock}>
-          <ModeSummary mode={mode} selected={mode.isCurrent} />
+          <ModeSummary mode={mode} selected={mode.isCurrent} t={t} />
         </View>
       </Pressable>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled: requiresRestart }}
+        disabled={requiresRestart}
         onPress={() =>
           requiresInstall
             ? onSelect(mode.id)
@@ -217,19 +233,23 @@ function ModePreviewRow({
         style={({ pressed }) => [
           styles.favorite,
           requiresInstall && styles.install,
+          requiresRestart && styles.status,
           mode.isFavorite && styles.favoriteSelected,
-          pressed && styles.modePressed,
+          pressed && !requiresRestart && styles.modePressed,
         ]}
       >
         <Text
           style={[
             styles.favoriteText,
             requiresInstall && styles.installText,
+            requiresRestart && styles.statusText,
             mode.isFavorite && styles.modeTextSelected,
           ]}
         >
           {requiresInstall
-            ? t('install')
+            ? requiresRestart
+              ? t('pcRestart')
+              : t('install')
             : mode.isFavorite
               ? t('savedFavorite')
               : t('saveFavorite')}
@@ -269,8 +289,11 @@ function openRevertOverlay({
   });
 }
 
-export function modeLabel(mode: DisplayControlMode) {
-  const scale = mode.isHiDpi ? 'HiDPI' : '1x';
+export function modeLabel(
+  mode: DisplayControlMode,
+  t?: (key: TranslationKey) => string,
+) {
+  const scale = modeScaleLabel(mode, t);
 
   return `${mode.width} x ${mode.height} / ${Math.round(mode.refreshRate)}Hz / ${scale}`;
 }
@@ -438,6 +461,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#2b89ff',
     borderColor: '#2b89ff',
   },
+  status: {
+    backgroundColor: '#252830',
+    borderColor: '#353a45',
+  },
   favoriteText: {
     color: '#b2b6bd',
     fontFamily: font.family,
@@ -447,5 +474,8 @@ const styles = StyleSheet.create({
   },
   installText: {
     color: '#ffffff',
+  },
+  statusText: {
+    color: '#b2b6bd',
   },
 });

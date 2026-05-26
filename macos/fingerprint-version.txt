@@ -1,1 +1,1 @@
-CFBundleShortVersionString=0.0.1-alpha.1
+CFBundleShortVersionString=0.0.1-alpha.2

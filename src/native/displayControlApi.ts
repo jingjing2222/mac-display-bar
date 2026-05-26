@@ -14,6 +14,8 @@ export const fallbackSnapshot: DisplayControlSnapshot = {
   displayTopologyStatus: 'Unknown',
   displayTopologyChangedAt: '',
   displays: [],
+  virtualDisplays: [],
+  pipWindows: [],
   presets: [],
   syncGroups: [],
   layoutProtectionEnabled: false,
@@ -33,9 +35,32 @@ export type CustomResolutionDraft = {
   isHiDpi: boolean;
 };
 
+export type PanelResolutionDraft = {
+  width: number;
+  height: number;
+};
+
 const snapshotOrFallback = (
   snapshot: DisplayControlSnapshot | null | undefined,
-) => snapshot ?? fallbackSnapshot;
+) => {
+  if (snapshot == null) {
+    return fallbackSnapshot;
+  }
+
+  return {
+    ...fallbackSnapshot,
+    ...snapshot,
+    displays: snapshot.displays ?? [],
+    virtualDisplays: snapshot.virtualDisplays ?? [],
+    pipWindows: snapshot.pipWindows ?? [],
+    presets: snapshot.presets ?? [],
+    syncGroups: snapshot.syncGroups ?? [],
+    settings: {
+      ...fallbackSnapshot.settings,
+      ...snapshot.settings,
+    },
+  };
+};
 
 export const displayControlApi = {
   getSnapshot() {
@@ -161,6 +186,43 @@ export const displayControlApi = {
       NativeDisplayControl?.writeOverrideBundle(displayID),
     );
   },
+  installDisplayOverride(displayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.installDisplayOverride(displayID),
+    );
+  },
+  removeDisplayOverride(displayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.removeDisplayOverride(displayID),
+    );
+  },
+  reinitializeDisplay(displayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.reinitializeDisplay(displayID),
+    );
+  },
+  setNativePanelResolutionOverride(
+    displayID: string,
+    request: PanelResolutionDraft,
+  ) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.setNativePanelResolutionOverride(
+        displayID,
+        request.width,
+        request.height,
+      ),
+    );
+  },
+  clearNativePanelResolutionOverride(displayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.clearNativePanelResolutionOverride(displayID),
+    );
+  },
+  setFlexibleScalingEnabled(displayID: string, enabled: boolean) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.setFlexibleScalingEnabled(displayID, enabled),
+    );
+  },
   setDisplayRotation(displayID: string, rotation: number) {
     return snapshotOrFallback(
       NativeDisplayControl?.setDisplayRotation(displayID, rotation),
@@ -184,6 +246,51 @@ export const displayControlApi = {
   reconnectDisplay(displayID: string) {
     return snapshotOrFallback(
       NativeDisplayControl?.reconnectDisplay(displayID),
+    );
+  },
+  createVirtualDisplay(
+    targetDisplayID: string,
+    width: number,
+    height: number,
+    refreshRate: number,
+    isHiDpi: boolean,
+  ) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.createVirtualDisplay(
+        targetDisplayID,
+        width,
+        height,
+        refreshRate,
+        isHiDpi,
+      ),
+    );
+  },
+  removeVirtualDisplay(virtualDisplayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.removeVirtualDisplay(virtualDisplayID),
+    );
+  },
+  mirrorVirtualDisplayToTarget(virtualDisplayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.mirrorVirtualDisplayToTarget(virtualDisplayID),
+    );
+  },
+  stopVirtualDisplayMirroring(virtualDisplayID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.stopVirtualDisplayMirroring(virtualDisplayID),
+    );
+  },
+  openDisplayPip(displayID: string) {
+    return snapshotOrFallback(NativeDisplayControl?.openDisplayPip(displayID));
+  },
+  closeDisplayPip(pipWindowID: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.closeDisplayPip(pipWindowID),
+    );
+  },
+  setPipWindowFilter(pipWindowID: string, filter: string) {
+    return snapshotOrFallback(
+      NativeDisplayControl?.setPipWindowFilter(pipWindowID, filter),
     );
   },
   saveFavoriteMode(displayID: string, modeID: string) {

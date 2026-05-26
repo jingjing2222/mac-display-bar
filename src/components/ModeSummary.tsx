@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { DisplayControlMode } from '../../specs/NativeDisplayControl';
+import type { TranslationKey } from '../i18n/strings';
 
 const font = {
   family: 'Inter',
@@ -9,9 +10,11 @@ const font = {
 export function ModeSummary({
   mode,
   selected = false,
+  t = defaultT,
 }: {
   mode: DisplayControlMode;
   selected?: boolean;
+  t?: (key: TranslationKey) => string;
 }) {
   return (
     <View style={styles.block}>
@@ -27,14 +30,42 @@ export function ModeSummary({
           style={[
             styles.scale,
             mode.isHiDpi && styles.hidpiScale,
+            mode.requiresOverride === true && styles.installScale,
             selected && styles.selectedMeta,
           ]}
         >
-          {mode.isHiDpi ? 'HiDPI' : '1x'}
+          {modeScaleLabel(mode, t)}
         </Text>
       </View>
     </View>
   );
+}
+
+export function modeScaleLabel(
+  mode: DisplayControlMode,
+  t: (key: TranslationKey) => string = defaultT,
+) {
+  if (mode.requiresRestart === true) {
+    return t('pcRestart');
+  }
+
+  if (mode.requiresOverride === true) {
+    return t('installTarget');
+  }
+
+  return mode.isHiDpi ? 'HiDPI' : '1x';
+}
+
+function defaultT(key: TranslationKey) {
+  if (key === 'pcRestart') {
+    return 'PC Restart';
+  }
+
+  if (key === 'installTarget') {
+    return 'Install target';
+  }
+
+  return key;
 }
 
 const styles = StyleSheet.create({
@@ -78,6 +109,9 @@ const styles = StyleSheet.create({
   },
   hidpiScale: {
     color: '#00ca8e',
+  },
+  installScale: {
+    color: '#f2cc60',
   },
   selectedText: {
     color: '#ffffff',

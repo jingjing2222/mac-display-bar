@@ -96,6 +96,10 @@ test('menu bar popover stays open while an admin install prompt is active', () =
   );
   expect(appDelegate).toContain('privilegedPromptDepth');
   expect(appDelegate).toContain('NSPopoverBehaviorApplicationDefined');
+  expect(appDelegate).toContain('if ([NSThread isMainThread])');
+  expect(appDelegate).toContain(
+    'dispatch_sync(dispatch_get_main_queue(), updatePopover)',
+  );
   expect(appDelegate).toContain(
     'shouldKeepStatusPopoverOpenForPrivilegedPrompt',
   );

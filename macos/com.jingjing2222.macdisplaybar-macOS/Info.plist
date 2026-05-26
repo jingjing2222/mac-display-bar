@@ -19,13 +19,13 @@
 		<key>CFBundlePackageType</key>
 		<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 		<key>CFBundleShortVersionString</key>
-		<string>0.0.1-alpha.1</string>
+		<string>0.0.1-alpha.2</string>
 		<key>CFBundleVersion</key>
 		<string>1</string>
 		<key>HOT_UPDATER_CHANNEL</key>
 		<string>production</string>
 		<key>HOT_UPDATER_FINGERPRINT_HASH</key>
-		<string>c03d0d7ea4d7205a34976efac9e36231f96b335d</string>
+		<string>53a508b87a9b3956fea09dbf4a68d0056d73a191</string>
 		<key>LSMinimumSystemVersion</key>
 		<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 		<key>LSUIElement</key>

@@ -1,6 +1,7 @@
 #import "RCTNativeDisplayControl.h"
 
 #import "../DisplayCore/RCTDisplayCore.h"
+#import "RCTNativeDisplayLocale.h"
 
 @interface RCTNativeDisplayControl ()
 
@@ -29,14 +30,7 @@
 
 - (NSString *)getSystemLocale
 {
-  NSString *preferredLanguage = [NSLocale preferredLanguages].firstObject;
-
-  if (preferredLanguage.length > 0) {
-    return preferredLanguage;
-  }
-
-  NSString *currentLocale = [NSLocale currentLocale].localeIdentifier;
-  return currentLocale.length > 0 ? currentLocale : @"en-US";
+  return RCTNativeDisplayResolvedSystemLocale();
 }
 
 - (NSDictionary *)getSnapshot
@@ -170,6 +164,36 @@
   return [self.displayCore writeOverrideBundle:displayID];
 }
 
+- (NSDictionary *)installDisplayOverride:(NSString *)displayID
+{
+  return [self.displayCore installDisplayOverride:displayID];
+}
+
+- (NSDictionary *)removeDisplayOverride:(NSString *)displayID
+{
+  return [self.displayCore removeDisplayOverride:displayID];
+}
+
+- (NSDictionary *)reinitializeDisplay:(NSString *)displayID
+{
+  return [self.displayCore reinitializeDisplay:displayID];
+}
+
+- (NSDictionary *)setNativePanelResolutionOverride:(NSString *)displayID width:(double)width height:(double)height
+{
+  return [self.displayCore setNativePanelResolutionOverride:displayID width:width height:height];
+}
+
+- (NSDictionary *)clearNativePanelResolutionOverride:(NSString *)displayID
+{
+  return [self.displayCore clearNativePanelResolutionOverride:displayID];
+}
+
+- (NSDictionary *)setFlexibleScalingEnabled:(NSString *)displayID enabled:(BOOL)enabled
+{
+  return [self.displayCore setFlexibleScalingEnabled:displayID enabled:enabled];
+}
+
 - (NSDictionary *)setDisplayRotation:(NSString *)displayID rotation:(double)rotation
 {
   return [self.displayCore setDisplayRotation:displayID rotation:rotation];
@@ -193,6 +217,49 @@
 - (NSDictionary *)reconnectDisplay:(NSString *)displayID
 {
   return [self.displayCore reconnectDisplay:displayID];
+}
+
+- (NSDictionary *)createVirtualDisplay:(NSString *)targetDisplayID
+                                  width:(double)width
+                                 height:(double)height
+                            refreshRate:(double)refreshRate
+                                isHiDpi:(BOOL)isHiDpi
+{
+  return [self.displayCore createVirtualDisplay:targetDisplayID
+                                          width:width
+                                         height:height
+                                    refreshRate:refreshRate
+                                        isHiDpi:isHiDpi];
+}
+
+- (NSDictionary *)removeVirtualDisplay:(NSString *)virtualDisplayID
+{
+  return [self.displayCore removeVirtualDisplay:virtualDisplayID];
+}
+
+- (NSDictionary *)mirrorVirtualDisplayToTarget:(NSString *)virtualDisplayID
+{
+  return [self.displayCore mirrorVirtualDisplayToTarget:virtualDisplayID];
+}
+
+- (NSDictionary *)stopVirtualDisplayMirroring:(NSString *)virtualDisplayID
+{
+  return [self.displayCore stopVirtualDisplayMirroring:virtualDisplayID];
+}
+
+- (NSDictionary *)openDisplayPip:(NSString *)displayID
+{
+  return [self.displayCore openDisplayPip:displayID];
+}
+
+- (NSDictionary *)setPipWindowFilter:(NSString *)pipWindowID filter:(NSString *)filter
+{
+  return [self.displayCore setPipWindowFilter:pipWindowID filter:filter];
+}
+
+- (NSDictionary *)closeDisplayPip:(NSString *)pipWindowID
+{
+  return [self.displayCore closeDisplayPip:pipWindowID];
 }
 
 - (NSDictionary *)saveFavoriteMode:(NSString *)displayID modeID:(NSString *)modeID

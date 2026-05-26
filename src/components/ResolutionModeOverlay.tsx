@@ -38,15 +38,18 @@ export function ResolutionModeOverlay({
     const scaleFilterEnabled = filters.hidpi || filters.standardScale;
 
     return modes.filter((mode) => {
+      const isInstallCandidate = mode.requiresOverride === true;
       const matchesQuery =
         !normalizedQuery ||
-        `${mode.width} ${mode.height} ${Math.round(mode.refreshRate)} ${mode.isHiDpi ? 'hidpi' : '1x'}`
+        `${mode.width} ${mode.height} ${Math.round(mode.refreshRate)} ${
+          mode.isHiDpi || isInstallCandidate ? 'hidpi' : '1x'
+        }`
           .toLowerCase()
           .includes(normalizedQuery);
       const matchesScale =
         !scaleFilterEnabled ||
-        (filters.hidpi && mode.isHiDpi) ||
-        (filters.standardScale && !mode.isHiDpi);
+        (filters.hidpi && (mode.isHiDpi || isInstallCandidate)) ||
+        (filters.standardScale && !mode.isHiDpi && !isInstallCandidate);
       const matchesFavorite = !filters.favorites || mode.isFavorite;
       const matchesCurrent = !filters.current || mode.isCurrent;
 
@@ -152,13 +155,20 @@ function ModeOverlayRow({
   t: (key: TranslationKey) => string;
 }) {
   const requiresInstall = mode.requiresOverride === true;
+  const requiresRestart = mode.requiresRestart === true;
+  const canSelect = !requiresRestart;
 
   return (
     <View style={[styles.row, mode.isCurrent && styles.rowSelected]}>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled: requiresRestart }}
+        disabled={requiresRestart}
         onPress={() => onSelect(mode.id)}
-        style={({ pressed }) => [styles.rowMain, pressed && styles.rowPressed]}
+        style={({ pressed }) => [
+          styles.rowMain,
+          pressed && canSelect && styles.rowPressed,
+        ]}
       >
         <View style={styles.rowIcon}>
           <Icon
@@ -168,11 +178,13 @@ function ModeOverlayRow({
           />
         </View>
         <View style={styles.rowTextBlock}>
-          <ModeSummary mode={mode} selected={mode.isCurrent} />
+          <ModeSummary mode={mode} selected={mode.isCurrent} t={t} />
         </View>
       </Pressable>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled: requiresRestart }}
+        disabled={requiresRestart}
         onPress={() =>
           requiresInstall
             ? onSelect(mode.id)
@@ -183,19 +195,23 @@ function ModeOverlayRow({
         style={({ pressed }) => [
           styles.favoriteButton,
           requiresInstall && styles.installButton,
+          requiresRestart && styles.statusButton,
           mode.isFavorite && styles.favoriteButtonSelected,
-          pressed && styles.rowPressed,
+          pressed && !requiresRestart && styles.rowPressed,
         ]}
       >
         <Text
           style={[
             styles.favoriteText,
             requiresInstall && styles.installText,
+            requiresRestart && styles.statusText,
             mode.isFavorite && styles.favoriteTextSelected,
           ]}
         >
           {requiresInstall
-            ? t('install')
+            ? requiresRestart
+              ? t('pcRestart')
+              : t('install')
             : mode.isFavorite
               ? t('savedFavorite')
               : t('saveFavorite')}
@@ -412,6 +428,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#2b89ff',
     borderColor: '#2b89ff',
   },
+  statusButton: {
+    backgroundColor: '#252830',
+    borderColor: '#353a45',
+  },
   favoriteText: {
     color: '#b2b6bd',
     fontFamily: font.family,
@@ -424,6 +444,9 @@ const styles = StyleSheet.create({
   },
   installText: {
     color: '#ffffff',
+  },
+  statusText: {
+    color: '#b2b6bd',
   },
   empty: {
     alignItems: 'center',

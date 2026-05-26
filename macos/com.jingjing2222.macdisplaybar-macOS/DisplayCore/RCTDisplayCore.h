@@ -35,11 +35,28 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSDictionary *)queueEdidOverride:(NSString *)displayID;
 - (NSDictionary *)clearEdidOverride:(NSString *)displayID;
 - (NSDictionary *)writeOverrideBundle:(NSString *)displayID;
+- (NSDictionary *)installDisplayOverride:(NSString *)displayID;
+- (NSDictionary *)removeDisplayOverride:(NSString *)displayID;
+- (NSDictionary *)reinitializeDisplay:(NSString *)displayID;
+- (NSDictionary *)setNativePanelResolutionOverride:(NSString *)displayID width:(double)width height:(double)height;
+- (NSDictionary *)clearNativePanelResolutionOverride:(NSString *)displayID;
+- (NSDictionary *)setFlexibleScalingEnabled:(NSString *)displayID enabled:(BOOL)enabled;
 - (NSDictionary *)setDisplayRotation:(NSString *)displayID rotation:(double)rotation;
 - (NSDictionary *)enableXdrUpscale:(NSString *)displayID;
 - (NSDictionary *)disableXdrUpscale:(NSString *)displayID;
 - (NSDictionary *)softDisconnectDisplay:(NSString *)displayID;
 - (NSDictionary *)reconnectDisplay:(NSString *)displayID;
+- (NSDictionary *)createVirtualDisplay:(NSString *)targetDisplayID
+                                  width:(double)width
+                                 height:(double)height
+                            refreshRate:(double)refreshRate
+                                isHiDpi:(BOOL)isHiDpi;
+- (NSDictionary *)mirrorVirtualDisplayToTarget:(NSString *)virtualDisplayID;
+- (NSDictionary *)stopVirtualDisplayMirroring:(NSString *)virtualDisplayID;
+- (NSDictionary *)removeVirtualDisplay:(NSString *)virtualDisplayID;
+- (NSDictionary *)openDisplayPip:(NSString *)displayID;
+- (NSDictionary *)setPipWindowFilter:(NSString *)pipWindowID filter:(NSString *)filter;
+- (NSDictionary *)closeDisplayPip:(NSString *)pipWindowID;
 - (NSDictionary *)saveFavoriteMode:(NSString *)displayID modeID:(NSString *)modeID;
 - (NSDictionary *)removeFavoriteMode:(NSString *)displayID modeID:(NSString *)modeID;
 - (NSDictionary *)setDdcControl:(NSString *)displayID controlCode:(double)controlCode value:(double)value;

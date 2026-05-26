@@ -7,6 +7,7 @@ import type {
 import {
   displayControlApi,
   type CustomResolutionDraft,
+  type PanelResolutionDraft,
 } from '../../native/displayControlApi';
 
 type RunSnapshotOperation = (operation: () => DisplayControlSnapshot) => void;
@@ -112,6 +113,36 @@ export function useDisplayControlActions({
         runSnapshotOperation(() =>
           displayControlApi.writeOverrideBundle(displayID),
         ),
+      installDisplayOverride: (displayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.installDisplayOverride(displayID),
+        ),
+      removeDisplayOverride: (displayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.removeDisplayOverride(displayID),
+        ),
+      reinitializeDisplay: (displayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.reinitializeDisplay(displayID),
+        ),
+      setNativePanelResolutionOverride: (
+        displayID: string,
+        request: PanelResolutionDraft,
+      ) =>
+        runSnapshotOperation(() =>
+          displayControlApi.setNativePanelResolutionOverride(
+            displayID,
+            request,
+          ),
+        ),
+      clearNativePanelResolutionOverride: (displayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.clearNativePanelResolutionOverride(displayID),
+        ),
+      setFlexibleScalingEnabled: (displayID: string, enabled: boolean) =>
+        runSnapshotOperation(() =>
+          displayControlApi.setFlexibleScalingEnabled(displayID, enabled),
+        ),
       setDisplayRotation: (displayID: string, rotation: number) =>
         runSnapshotOperation(() =>
           displayControlApi.setDisplayRotation(displayID, rotation),
@@ -131,6 +162,41 @@ export function useDisplayControlActions({
       reconnectDisplay: (displayID: string) =>
         runSnapshotOperation(() =>
           displayControlApi.reconnectDisplay(displayID),
+        ),
+      createVirtualDisplay: (
+        targetDisplayID: string,
+        request: CustomResolutionDraft,
+      ) =>
+        runSnapshotOperation(() =>
+          displayControlApi.createVirtualDisplay(
+            targetDisplayID,
+            request.width,
+            request.height,
+            request.refreshRate,
+            request.isHiDpi,
+          ),
+        ),
+      removeVirtualDisplay: (virtualDisplayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.removeVirtualDisplay(virtualDisplayID),
+        ),
+      mirrorVirtualDisplayToTarget: (virtualDisplayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.mirrorVirtualDisplayToTarget(virtualDisplayID),
+        ),
+      stopVirtualDisplayMirroring: (virtualDisplayID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.stopVirtualDisplayMirroring(virtualDisplayID),
+        ),
+      openDisplayPip: (displayID: string) =>
+        runSnapshotOperation(() => displayControlApi.openDisplayPip(displayID)),
+      setPipWindowFilter: (pipWindowID: string, filter: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.setPipWindowFilter(pipWindowID, filter),
+        ),
+      closeDisplayPip: (pipWindowID: string) =>
+        runSnapshotOperation(() =>
+          displayControlApi.closeDisplayPip(pipWindowID),
         ),
       saveFavoriteMode: (displayID: string, modeID: string) =>
         runSnapshotOperation(() =>

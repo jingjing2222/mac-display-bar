@@ -22,12 +22,24 @@ export function useDisplaySnapshot() {
   }, [refreshSnapshot]);
 
   const refreshIntervalMilliseconds = useMemo(() => {
-    if (!value.settings.autoRefresh) {
+    const hasManagedLiveResources =
+      value.pipWindows.length > 0 || value.virtualDisplays.length > 0;
+
+    if (!value.settings.autoRefresh && !hasManagedLiveResources) {
       return null;
     }
 
+    if (!value.settings.autoRefresh && hasManagedLiveResources) {
+      return 2000;
+    }
+
     return Math.max(value.settings.refreshIntervalSeconds, 5) * 1000;
-  }, [value.settings.autoRefresh, value.settings.refreshIntervalSeconds]);
+  }, [
+    value.pipWindows.length,
+    value.settings.autoRefresh,
+    value.settings.refreshIntervalSeconds,
+    value.virtualDisplays.length,
+  ]);
 
   useIntervalEffect(refreshSnapshot, refreshIntervalMilliseconds);
 

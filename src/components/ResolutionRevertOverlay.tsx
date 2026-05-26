@@ -137,7 +137,7 @@ export function ResolutionRevertOverlay({
           <Text style={styles.previousLabel}>
             {t('resolutionPreviousMode')}
           </Text>
-          <ModeSummary mode={previousMode} />
+          <ModeSummary mode={previousMode} t={t} />
         </View>
         <View style={styles.actions}>
           <Pressable

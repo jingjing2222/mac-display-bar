@@ -1,0 +1,5 @@
+#include "../Domains/Modes/RCTDisplayCore+ModeListing.inc.mm"
+#include "../Domains/Modes/RCTDisplayCore+ModeDictionary.inc.mm"
+#include "../Domains/Modes/RCTDisplayCore+PrivateModes.inc.mm"
+#include "../Domains/Modes/RCTDisplayCore+ModeApply.inc.mm"
+#include "../Domains/Modes/RCTDisplayCore+DisplayLayoutApply.inc.mm"

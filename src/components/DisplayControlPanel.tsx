@@ -138,7 +138,10 @@ function DisplayPanel({
 }) {
   return (
     <View style={styles.panel}>
-      <Metric label={t('resolution')} value={modeLabel(display.currentMode)} />
+      <Metric
+        label={t('resolution')}
+        value={modeLabel(display.currentMode, t)}
+      />
       <Metric
         label={t('refreshRate')}
         value={`${display.currentMode.refreshRate}Hz`}
@@ -359,18 +362,56 @@ function AdvancedDisplayPanel({
       display.currentMode.width,
     ],
   );
+  const panelDraft = useMemo(
+    () => ({
+      height: `${
+        display.advanced.nativePanelOverrideHeight ||
+        display.advanced.nativePanelHeight ||
+        display.currentMode.height
+      }`,
+      width: `${
+        display.advanced.nativePanelOverrideWidth ||
+        display.advanced.nativePanelWidth ||
+        display.currentMode.width
+      }`,
+    }),
+    [
+      display.advanced.nativePanelHeight,
+      display.advanced.nativePanelOverrideHeight,
+      display.advanced.nativePanelOverrideWidth,
+      display.advanced.nativePanelWidth,
+      display.currentMode.height,
+      display.currentMode.width,
+    ],
+  );
   const [customWidth, setCustomWidth] = useState(modeDraft.width);
   const [customHeight, setCustomHeight] = useState(modeDraft.height);
   const [customRefreshRate, setCustomRefreshRate] = useState(
     modeDraft.refreshRate,
   );
   const [customIsHiDpi, setCustomIsHiDpi] = useState(true);
+  const [panelWidth, setPanelWidth] = useState(panelDraft.width);
+  const [panelHeight, setPanelHeight] = useState(panelDraft.height);
+  const [virtualWidth, setVirtualWidth] = useState(modeDraft.width);
+  const [virtualHeight, setVirtualHeight] = useState(modeDraft.height);
+  const [virtualRefreshRate, setVirtualRefreshRate] = useState(
+    modeDraft.refreshRate,
+  );
+  const [virtualIsHiDpi, setVirtualIsHiDpi] = useState(true);
 
   useEffect(() => {
     setCustomWidth(modeDraft.width);
     setCustomHeight(modeDraft.height);
     setCustomRefreshRate(modeDraft.refreshRate);
+    setVirtualWidth(modeDraft.width);
+    setVirtualHeight(modeDraft.height);
+    setVirtualRefreshRate(modeDraft.refreshRate);
   }, [display.id, modeDraft.height, modeDraft.refreshRate, modeDraft.width]);
+
+  useEffect(() => {
+    setPanelWidth(panelDraft.width);
+    setPanelHeight(panelDraft.height);
+  }, [display.id, panelDraft.height, panelDraft.width]);
 
   const customResolutionDraft = {
     height: positiveNumberFromInput(customHeight, display.currentMode.height),
@@ -381,6 +422,41 @@ function AdvancedDisplayPanel({
     ),
     width: positiveNumberFromInput(customWidth, display.currentMode.width),
   };
+  const panelResolutionDraft = {
+    height: positiveNumberFromInput(
+      panelHeight,
+      display.advanced.nativePanelHeight || display.currentMode.height,
+    ),
+    width: positiveNumberFromInput(
+      panelWidth,
+      display.advanced.nativePanelWidth || display.currentMode.width,
+    ),
+  };
+  const virtualDisplayDraft = {
+    height: positiveNumberFromInput(virtualHeight, display.currentMode.height),
+    isHiDpi: virtualIsHiDpi,
+    refreshRate: positiveNumberFromInput(
+      virtualRefreshRate,
+      display.currentMode.refreshRate || 60,
+    ),
+    width: positiveNumberFromInput(virtualWidth, display.currentMode.width),
+  };
+  const flexibleScalingIsActive = display.advanced.flexibleScalingEnabled;
+  const displayIdentityKeys = new Set(
+    [
+      display.identity.uuid,
+      `${display.identity.vendorID}:${display.identity.modelID}:${display.identity.serialNumber}`,
+    ].filter((identityKey) => identityKey.length > 0),
+  );
+  const virtualDisplaysForSelectedDisplay =
+    control.snapshot.virtualDisplays.filter(
+      (virtualDisplay) =>
+        virtualDisplay.targetDisplayID === display.id ||
+        displayIdentityKeys.has(virtualDisplay.targetIdentityKey),
+    );
+  const pipWindowsForSelectedDisplay = control.snapshot.pipWindows.filter(
+    (pipWindow) => pipWindow.displayID === display.id,
+  );
 
   return (
     <View style={styles.panel}>
@@ -402,6 +478,17 @@ function AdvancedDisplayPanel({
         />
       </ActionRow>
       <Text style={styles.itemTitle}>{t('compatibilitySettings')}</Text>
+      {display.advanced.overrideBundleStatus !== 'No bundle' ? (
+        <Notice
+          text={`${display.advanced.overrideBundleStatus}${
+            display.advanced.overridePendingReboot ? ` / ${t('pcRestart')}` : ''
+          }${
+            display.advanced.overrideLastError
+              ? ` / ${display.advanced.overrideLastError}`
+              : ''
+          }`}
+        />
+      ) : null}
       <ActionRow>
         <ActionButton
           icon="settings"
@@ -414,6 +501,76 @@ function AdvancedDisplayPanel({
           onPress={() => actions.clearEdidOverride(display.id)}
         />
       </ActionRow>
+      <ActionRow>
+        <ActionButton
+          icon="settings"
+          label={t('installSettings')}
+          onPress={() => actions.installDisplayOverride(display.id)}
+        />
+        <ActionButton
+          icon="settings"
+          label={t('removeSettings')}
+          onPress={() => actions.removeDisplayOverride(display.id)}
+        />
+        <ActionButton
+          disabled={!display.advanced.overridePendingReinitialize}
+          icon="settings"
+          label={t('reinitializeDisplay')}
+          onPress={() => actions.reinitializeDisplay(display.id)}
+        />
+      </ActionRow>
+      <Text style={styles.itemTitle}>{t('flexibleScaling')}</Text>
+      <Text style={styles.itemMeta}>
+        {display.advanced.flexibleScalingStatus} / {t('nativePanelResolution')}{' '}
+        {display.advanced.nativePanelWidth} x{' '}
+        {display.advanced.nativePanelHeight}
+        {display.advanced.nativePanelResolutionStatus
+          ? ` / ${display.advanced.nativePanelResolutionStatus}`
+          : ''}
+      </Text>
+      <ActionRow>
+        <ActionButton
+          icon="sliders"
+          label={t('enable')}
+          onPress={() => actions.setFlexibleScalingEnabled(display.id, true)}
+          selected={flexibleScalingIsActive}
+        />
+        <ActionButton
+          icon="sliders"
+          label={t('disable')}
+          onPress={() => actions.setFlexibleScalingEnabled(display.id, false)}
+          selected={!display.advanced.flexibleScalingEnabled}
+        />
+      </ActionRow>
+      <View style={styles.inputRow}>
+        <SmallInput
+          accessibilityLabel={t('width')}
+          onChangeText={setPanelWidth}
+          value={panelWidth}
+        />
+        <SmallInput
+          accessibilityLabel={t('height')}
+          onChangeText={setPanelHeight}
+          value={panelHeight}
+        />
+        <ActionButton
+          icon="display"
+          label={t('setPanelResolution')}
+          onPress={() =>
+            actions.setNativePanelResolutionOverride(
+              display.id,
+              panelResolutionDraft,
+            )
+          }
+          small
+        />
+        <ActionButton
+          icon="settings"
+          label={t('clearPanelResolution')}
+          onPress={() => actions.clearNativePanelResolutionOverride(display.id)}
+          small
+        />
+      </View>
       <Text style={styles.itemTitle}>{t('settingsFile')}</Text>
       <ActionRow>
         <ActionButton
@@ -453,6 +610,166 @@ function AdvancedDisplayPanel({
           onPress={() => actions.reconnectDisplay(display.id)}
         />
       </ActionRow>
+
+      <Text style={styles.itemTitle}>{t('virtualDisplay')}</Text>
+      <View style={styles.inputRow}>
+        <SmallInput
+          accessibilityLabel={`${t('virtualDisplay')} ${t('width')}`}
+          onChangeText={setVirtualWidth}
+          value={virtualWidth}
+        />
+        <SmallInput
+          accessibilityLabel={`${t('virtualDisplay')} ${t('height')}`}
+          onChangeText={setVirtualHeight}
+          value={virtualHeight}
+        />
+        <SmallInput
+          accessibilityLabel={`${t('virtualDisplay')} ${t('hz')}`}
+          onChangeText={setVirtualRefreshRate}
+          value={virtualRefreshRate}
+        />
+        <ActionButton
+          icon="sparkles"
+          label={t('hidpi')}
+          onPress={() => setVirtualIsHiDpi((value) => !value)}
+          selected={virtualIsHiDpi}
+          small
+        />
+      </View>
+      <ActionRow>
+        <ActionButton
+          icon="display"
+          label={t('createVirtualDisplay')}
+          onPress={() =>
+            actions.createVirtualDisplay(display.id, virtualDisplayDraft)
+          }
+        />
+      </ActionRow>
+      {virtualDisplaysForSelectedDisplay.length > 0 ? (
+        <StableLegendList
+          data={virtualDisplaysForSelectedDisplay}
+          estimatedItemSize={58}
+          keyExtractor={(virtualDisplay) => virtualDisplay.id}
+          renderItem={({ item: virtualDisplay }) => (
+            <View style={styles.itemHeader}>
+              <View style={styles.itemTextBlock}>
+                <Text style={styles.itemTitle}>{virtualDisplay.name}</Text>
+                <Text style={styles.itemMeta}>
+                  {virtualDisplay.width} x {virtualDisplay.height} /{' '}
+                  {virtualDisplay.isHiDpi ? 'HiDPI' : '1x'} /{' '}
+                  {virtualDisplay.status}
+                  {virtualDisplay.mirrorStatus
+                    ? ` / ${virtualDisplay.mirrorStatus}`
+                    : ''}
+                  {virtualDisplay.lastError
+                    ? ` / ${virtualDisplay.lastError}`
+                    : ''}
+                </Text>
+              </View>
+              <ActionButton
+                icon="display"
+                label={t('mirrorVirtualDisplay')}
+                onPress={() =>
+                  actions.mirrorVirtualDisplayToTarget(virtualDisplay.id)
+                }
+                small
+              />
+              <ActionButton
+                icon="display"
+                label={t('stopVirtualMirror')}
+                onPress={() =>
+                  actions.stopVirtualDisplayMirroring(virtualDisplay.id)
+                }
+                small
+              />
+              <ActionButton
+                icon="settings"
+                label={t('removeVirtualDisplay')}
+                onPress={() => actions.removeVirtualDisplay(virtualDisplay.id)}
+                small
+              />
+            </View>
+          )}
+          scrollEnabled={virtualDisplaysForSelectedDisplay.length > 3}
+          style={[
+            styles.inlineList,
+            {
+              height: inlineListHeight(
+                virtualDisplaysForSelectedDisplay.length,
+                58,
+              ),
+            },
+          ]}
+        />
+      ) : (
+        <Notice text={t('noVirtualDisplays')} />
+      )}
+
+      <Text style={styles.itemTitle}>{t('pictureInPicture')}</Text>
+      <ActionRow>
+        <ActionButton
+          icon="display"
+          label={t('openPip')}
+          onPress={() => actions.openDisplayPip(display.id)}
+        />
+      </ActionRow>
+      {pipWindowsForSelectedDisplay.length > 0 ? (
+        <StableLegendList
+          data={pipWindowsForSelectedDisplay}
+          estimatedItemSize={112}
+          keyExtractor={(pipWindow) => pipWindow.id}
+          renderItem={({ item: pipWindow }) => (
+            <View style={styles.pipItem}>
+              <View style={styles.itemHeader}>
+                <View style={styles.itemTextBlock}>
+                  <Text style={styles.itemTitle}>{pipWindow.name}</Text>
+                  <Text style={styles.itemMeta}>
+                    {Math.round(pipWindow.width)} x{' '}
+                    {Math.round(pipWindow.height)} / {pipWindow.fps}fps /{' '}
+                    {pipWindow.status}
+                    {pipWindow.filter
+                      ? ` / ${pipFilterLabel(pipWindow.filter, t)}`
+                      : ''}
+                    {pipWindow.lastError ? ` / ${pipWindow.lastError}` : ''}
+                  </Text>
+                </View>
+                <ActionButton
+                  icon="settings"
+                  label={t('closePip')}
+                  onPress={() => actions.closeDisplayPip(pipWindow.id)}
+                  small
+                />
+              </View>
+              <Text style={styles.itemMeta}>{t('videoFilter')}</Text>
+              <ActionRow>
+                {pipFilterOptions.map((option) => (
+                  <ActionButton
+                    key={option.value}
+                    label={t(option.key)}
+                    onPress={() =>
+                      actions.setPipWindowFilter(pipWindow.id, option.value)
+                    }
+                    selected={pipWindow.filter === option.value}
+                    small
+                  />
+                ))}
+              </ActionRow>
+            </View>
+          )}
+          scrollEnabled={pipWindowsForSelectedDisplay.length > 3}
+          style={[
+            styles.inlineList,
+            {
+              height: inlineListHeight(
+                pipWindowsForSelectedDisplay.length,
+                112,
+              ),
+            },
+          ]}
+        />
+      ) : (
+        <Notice text={t('noPipWindows')} />
+      )}
 
       <Text style={styles.itemTitle}>{t('customResolution')}</Text>
       <View style={styles.inputRow}>
@@ -853,6 +1170,13 @@ function inlineListHeight(itemCount: number, itemHeight: number) {
   return Math.min(Math.max(itemCount, 1), 3) * itemHeight;
 }
 
+function pipFilterLabel(filter: string, t: (key: TranslationKey) => string) {
+  const option = pipFilterOptions.find(
+    (candidate) => candidate.value === filter,
+  );
+  return option == null ? t('filterNone') : t(option.key);
+}
+
 const inputOptions = [
   { label: 'VGA', value: 1 },
   { label: 'DVI', value: 3 },
@@ -861,6 +1185,17 @@ const inputOptions = [
   { label: 'HDMI1', value: 17 },
   { label: 'HDMI2', value: 18 },
   { label: 'USB-C', value: 27 },
+];
+
+const pipFilterOptions: Array<{
+  key: TranslationKey;
+  value: string;
+}> = [
+  { key: 'filterNone', value: 'none' },
+  { key: 'filterMono', value: 'mono' },
+  { key: 'filterInvert', value: 'invert' },
+  { key: 'filterWarm', value: 'warm' },
+  { key: 'filterVibrant', value: 'vibrant' },
 ];
 
 const styles = StyleSheet.create({
@@ -913,6 +1248,9 @@ const styles = StyleSheet.create({
   itemHeader: {
     alignItems: 'center',
     flexDirection: 'row',
+    marginTop: 8,
+  },
+  pipItem: {
     marginTop: 8,
   },
   itemTextBlock: {

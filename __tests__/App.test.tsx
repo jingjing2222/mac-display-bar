@@ -20,6 +20,40 @@ const nativeSnapshot = vi.hoisted(() => ({
   displayTopologyRevision: 2,
   displayTopologyStatus: 'Stable',
   displayTopologyChangedAt: '',
+  virtualDisplays: [
+    {
+      id: 'virtual-1',
+      targetDisplayID: '1',
+      targetIdentityKey: 'B7E8A6A8-2C78-49C5-B509-A3E73E4761BD',
+      displayID: '8',
+      mirrorTargetDisplayID: '1',
+      mirrorSourceDisplayID: '8',
+      mirrorMode: 'target-mirrors-virtual',
+      mirrorStatus: 'Mirrored to target',
+      mirrorUpdatedAt: 0,
+      name: 'macDisplayBar Virtual 3440x1440',
+      width: 3440,
+      height: 1440,
+      refreshRate: 60,
+      isHiDpi: true,
+      serialNumber: 1234,
+      status: 'Created',
+      lastError: '',
+    },
+  ],
+  pipWindows: [
+    {
+      id: 'pip-1',
+      displayID: '1',
+      name: 'macDisplayBar PiP - Color LCD',
+      width: 480,
+      height: 270,
+      fps: 2,
+      filter: 'none',
+      status: 'Open',
+      lastError: '',
+    },
+  ],
   presets: [
     { name: 'Desk', createdAt: '2026-05-22T00:00:00Z', displayCount: 1 },
   ],
@@ -98,9 +132,11 @@ const nativeSnapshot = vi.hoisted(() => ({
           width: 3440,
           height: 1440,
           refreshRate: 60,
-          isHiDpi: true,
+          isHiDpi: false,
           isCurrent: false,
           isFavorite: false,
+          requiresOverride: true,
+          source: 'generated' as const,
         },
       ],
       modeStatus: 'Ready',
@@ -148,6 +184,20 @@ const nativeSnapshot = vi.hoisted(() => ({
         edidOverrideStatus: 'No override',
         overrideBundlePath: '',
         overrideBundleStatus: 'No bundle',
+        overrideInstalledPath: '',
+        overrideBackupPath: '',
+        overrideInstalledHash: '',
+        overrideBackupHash: '',
+        overridePendingReboot: false,
+        overridePendingReinitialize: false,
+        overrideLastError: '',
+        nativePanelWidth: 3440,
+        nativePanelHeight: 1440,
+        nativePanelOverrideWidth: 3440,
+        nativePanelOverrideHeight: 1440,
+        nativePanelResolutionStatus: 'Override 3440x1440 (detected 3440x1440)',
+        flexibleScalingEnabled: true,
+        flexibleScalingStatus: 'Enabled',
         rotationRequest: 0,
         rotationStatus: 'Current',
         softConnectionState: 'connected',
@@ -235,6 +285,20 @@ const nativeSnapshot = vi.hoisted(() => ({
         edidOverrideStatus: 'No override',
         overrideBundlePath: '',
         overrideBundleStatus: 'No bundle',
+        overrideInstalledPath: '',
+        overrideBackupPath: '',
+        overrideInstalledHash: '',
+        overrideBackupHash: '',
+        overridePendingReboot: false,
+        overridePendingReinitialize: false,
+        overrideLastError: '',
+        nativePanelWidth: 5120,
+        nativePanelHeight: 2880,
+        nativePanelOverrideWidth: 0,
+        nativePanelOverrideHeight: 0,
+        nativePanelResolutionStatus: 'Detected 5120x2880',
+        flexibleScalingEnabled: false,
+        flexibleScalingStatus: 'Disabled',
         rotationRequest: 0,
         rotationStatus: 'Current',
         softConnectionState: 'connected',
@@ -289,11 +353,24 @@ vi.mock('../specs/NativeDisplayControl', () => {
     queueEdidOverride: vi.fn(() => nativeSnapshot),
     clearEdidOverride: vi.fn(() => nativeSnapshot),
     writeOverrideBundle: vi.fn(() => nativeSnapshot),
+    installDisplayOverride: vi.fn(() => nativeSnapshot),
+    removeDisplayOverride: vi.fn(() => nativeSnapshot),
+    reinitializeDisplay: vi.fn(() => nativeSnapshot),
+    setNativePanelResolutionOverride: vi.fn(() => nativeSnapshot),
+    clearNativePanelResolutionOverride: vi.fn(() => nativeSnapshot),
+    setFlexibleScalingEnabled: vi.fn(() => nativeSnapshot),
     setDisplayRotation: vi.fn(() => nativeSnapshot),
     enableXdrUpscale: vi.fn(() => nativeSnapshot),
     disableXdrUpscale: vi.fn(() => nativeSnapshot),
     softDisconnectDisplay: vi.fn(() => nativeSnapshot),
     reconnectDisplay: vi.fn(() => nativeSnapshot),
+    createVirtualDisplay: vi.fn(() => nativeSnapshot),
+    mirrorVirtualDisplayToTarget: vi.fn(() => nativeSnapshot),
+    stopVirtualDisplayMirroring: vi.fn(() => nativeSnapshot),
+    removeVirtualDisplay: vi.fn(() => nativeSnapshot),
+    openDisplayPip: vi.fn(() => nativeSnapshot),
+    setPipWindowFilter: vi.fn(() => nativeSnapshot),
+    closeDisplayPip: vi.fn(() => nativeSnapshot),
     saveFavoriteMode: vi.fn(() => nativeSnapshot),
     removeFavoriteMode: vi.fn(() => nativeSnapshot),
     setDdcControl: vi.fn(() => nativeSnapshot),
@@ -548,6 +625,63 @@ test('generated HiDPI mode installs without opening a guidance or revert flow', 
   );
 });
 
+test('restart-required generated HiDPI row is status-only', async () => {
+  const restartSnapshot = {
+    ...nativeSnapshot,
+    displays: [
+      {
+        ...nativeSnapshot.displays[0],
+        currentMode: {
+          ...nativeSnapshot.displays[0].currentMode,
+          isFavorite: false,
+        },
+        availableModes: [
+          {
+            ...nativeSnapshot.displays[0].availableModes[0],
+            isFavorite: false,
+          },
+          {
+            id: 'generated-hidpi:3440:1440:60.000',
+            width: 3440,
+            height: 1440,
+            refreshRate: 60,
+            isHiDpi: true,
+            isCurrent: false,
+            isFavorite: false,
+            requiresOverride: true,
+            requiresRestart: true,
+            source: 'generated' as const,
+          },
+        ],
+      },
+    ],
+  };
+  vi.mocked(NativeDisplayControl!.getSnapshot).mockReturnValueOnce(
+    restartSnapshot,
+  );
+  vi.mocked(NativeDisplayControl!.refreshSnapshot).mockReturnValueOnce(
+    restartSnapshot,
+  );
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const restartButtons = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .filter((node) => normalizedText(node).includes('PC Restart'));
+
+  expect(restartButtons.length).toBeGreaterThan(0);
+  expect(restartButtons.every((node) => node.props.disabled === true)).toBe(
+    true,
+  );
+  expect(NativeDisplayControl!.setDisplayMode).not.toHaveBeenCalledWith(
+    '1',
+    'generated-hidpi:3440:1440:60.000',
+  );
+});
+
 test('advanced tab exposes low-level display operations only after selection', async () => {
   let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
 
@@ -568,8 +702,319 @@ test('advanced tab exposes low-level display operations only after selection', a
   expect(renderedText).toContain('Display information');
   expect(renderedText).toContain('Custom resolution');
   expect(renderedText).toContain('Extra brightness');
+  expect(renderedText).toContain('Flexible scaling');
+  expect(renderedText).toContain('Native panel');
   expect(renderedText).toContain('UUID');
   expect(renderedText).toContain('Sync and layout');
+});
+
+test('advanced tab wires override install lifecycle actions', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const installButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Install'));
+  const removeButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Remove'));
+
+  await ReactTestRenderer.act(() => {
+    installButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    removeButton!.props.onPress();
+  });
+
+  expect(NativeDisplayControl!.installDisplayOverride).toHaveBeenCalledWith(
+    '1',
+  );
+  expect(NativeDisplayControl!.removeDisplayOverride).toHaveBeenCalledWith('1');
+});
+
+test('advanced tab wires flexible scaling and native panel resolution actions', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const enableButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Enable'));
+  const setPanelButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Set panel'));
+  const clearPanelButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Clear panel'));
+
+  await ReactTestRenderer.act(() => {
+    enableButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    setPanelButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    clearPanelButton!.props.onPress();
+  });
+
+  expect(NativeDisplayControl!.setFlexibleScalingEnabled).toHaveBeenCalledWith(
+    '1',
+    true,
+  );
+  expect(
+    NativeDisplayControl!.setNativePanelResolutionOverride,
+  ).toHaveBeenCalledWith('1', 3440, 1440);
+  expect(
+    NativeDisplayControl!.clearNativePanelResolutionOverride,
+  ).toHaveBeenCalledWith('1');
+});
+
+test('advanced tab creates and removes virtual displays', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const createVirtualButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Create virtual'));
+  const virtualWidthInput = renderer!.root.findByProps({
+    accessibilityLabel: 'Virtual display Width',
+  });
+  const virtualHeightInput = renderer!.root.findByProps({
+    accessibilityLabel: 'Virtual display Height',
+  });
+  const virtualRefreshInput = renderer!.root.findByProps({
+    accessibilityLabel: 'Virtual display Hz',
+  });
+  const removeVirtualButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Remove virtual'));
+  const mirrorVirtualButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Mirror'));
+  const stopMirrorButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Stop mirror'));
+
+  await ReactTestRenderer.act(() => {
+    virtualWidthInput!.props.onChangeText('3840');
+    virtualHeightInput!.props.onChangeText('2160');
+    virtualRefreshInput!.props.onChangeText('100');
+  });
+  await ReactTestRenderer.act(() => {
+    createVirtualButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    mirrorVirtualButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    stopMirrorButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    removeVirtualButton!.props.onPress();
+  });
+
+  expect(NativeDisplayControl!.createVirtualDisplay).toHaveBeenCalledWith(
+    '1',
+    3840,
+    2160,
+    100,
+    true,
+  );
+  expect(
+    NativeDisplayControl!.mirrorVirtualDisplayToTarget,
+  ).toHaveBeenCalledWith('virtual-1');
+  expect(
+    NativeDisplayControl!.stopVirtualDisplayMirroring,
+  ).toHaveBeenCalledWith('virtual-1');
+  expect(NativeDisplayControl!.removeVirtualDisplay).toHaveBeenCalledWith(
+    'virtual-1',
+  );
+});
+
+test('advanced tab opens and closes Picture in Picture windows', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const openPipButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Open PiP'));
+  const closePipButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Close PiP'));
+  const invertFilterButton = renderer!.root
+    .findAllByProps({ accessibilityRole: 'button' })
+    .find((node) => normalizedText(node).includes('Invert'));
+
+  expect(normalizedText(renderer!.root)).toContain('Video filter');
+
+  await ReactTestRenderer.act(() => {
+    openPipButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    invertFilterButton!.props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    closePipButton!.props.onPress();
+  });
+
+  expect(NativeDisplayControl!.openDisplayPip).toHaveBeenCalledWith('1');
+  expect(NativeDisplayControl!.setPipWindowFilter).toHaveBeenCalledWith(
+    'pip-1',
+    'invert',
+  );
+  expect(NativeDisplayControl!.closeDisplayPip).toHaveBeenCalledWith('pip-1');
+});
+
+test('advanced tab localizes Picture in Picture filter metadata', async () => {
+  const localizedSnapshot = {
+    ...nativeSnapshot,
+    pipWindows: [
+      {
+        ...nativeSnapshot.pipWindows[0],
+        filter: 'invert',
+      },
+    ],
+  };
+  vi.mocked(NativeDisplayControl!.getSystemLocale).mockReturnValue('ko-KR');
+  vi.mocked(NativeDisplayControl!.getSnapshot).mockReturnValueOnce(
+    localizedSnapshot,
+  );
+  vi.mocked(NativeDisplayControl!.refreshSnapshot).mockReturnValueOnce(
+    localizedSnapshot,
+  );
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('고급'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  const renderedText = normalizedText(renderer!.root);
+  expect(renderedText).toContain('480 x 270 / 2 fps / Open / 반전');
+  expect(renderedText).not.toContain('Open / invert');
+});
+
+test('advanced tab scopes virtual displays to the selected display', async () => {
+  const scopedSnapshot = {
+    ...nativeSnapshot,
+    virtualDisplays: [
+      {
+        ...nativeSnapshot.virtualDisplays[0],
+        targetDisplayID: '2',
+        targetIdentityKey: 'C8E8A6A8-2C78-49C5-B509-A3E73E4761BD',
+      },
+    ],
+  };
+  vi.mocked(NativeDisplayControl!.getSnapshot).mockReturnValueOnce(
+    scopedSnapshot,
+  );
+  vi.mocked(NativeDisplayControl!.refreshSnapshot).mockReturnValueOnce(
+    scopedSnapshot,
+  );
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  expect(normalizedText(renderer!.root)).toContain(
+    'No virtual displays created by macDisplayBar.',
+  );
+  expect(normalizedText(renderer!.root)).not.toContain('Stop mirror');
+});
+
+test('advanced tab scopes Picture in Picture windows to the selected display', async () => {
+  const scopedSnapshot = {
+    ...nativeSnapshot,
+    pipWindows: [
+      {
+        ...nativeSnapshot.pipWindows[0],
+        displayID: '2',
+      },
+    ],
+  };
+  vi.mocked(NativeDisplayControl!.getSnapshot).mockReturnValueOnce(
+    scopedSnapshot,
+  );
+  vi.mocked(NativeDisplayControl!.refreshSnapshot).mockReturnValueOnce(
+    scopedSnapshot,
+  );
+  let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
+
+  await ReactTestRenderer.act(() => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  const advancedTab = renderer!.root
+    .findAllByType(Pressable)
+    .find((node) => instanceText(node).includes('Advanced'));
+
+  await ReactTestRenderer.act(() => {
+    advancedTab!.props.onPress();
+  });
+
+  expect(normalizedText(renderer!.root)).toContain(
+    'No PiP windows open for this display.',
+  );
+  expect(normalizedText(renderer!.root)).not.toContain('Close PiP');
 });
 
 test('disables display movement controls when only one display is connected', async () => {
@@ -626,7 +1071,8 @@ test('extra brightness actions call the native display control', async () => {
 
   const enableExtraBrightness = renderer!.root
     .findAllByProps({ accessibilityRole: 'button' })
-    .find((node) => normalizedText(node).includes('Enable'));
+    .filter((node) => normalizedText(node).includes('Enable'))
+    .at(-1);
 
   await ReactTestRenderer.act(() => {
     enableExtraBrightness!.props.onPress();
